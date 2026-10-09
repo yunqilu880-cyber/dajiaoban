@@ -4,13 +4,14 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#f3f0e6" />
-    <meta name="description" content="大脚板智能鞋健康管理平台概念演示：从足部信号到可理解的日常养护建议。" />
+    <meta name="description" content="大脚板智能鞋健康管理平台：了解8点压力与IMU原型方案，体验从模拟足部信号、个人趋势到可解释养护建议的完整流程。" />
     <title>大脚板｜让每一步都有回响</title>
     <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Noto+Sans+SC:wght@400;500;600;700&family=Noto+Serif+SC:wght@500;600;700&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="./styles.css" />
+    <link rel="stylesheet" href="./content.css" />
   </head>
   <body>
     <a class="skip-link" href="#main">跳转到正文</a>
@@ -19,7 +20,7 @@
         <span class="brand-seal" aria-hidden="true"><svg viewBox="0 0 48 48"><path d="M14 32c8-2 14-8 19-19M19 36c8-1 14-5 17-11M13 23c3 0 5 2 5 5" fill="none" stroke="currentColor" stroke-width="2.7" stroke-linecap="round"/><circle cx="32" cy="13" r="2" fill="currentColor"/></svg></span>
         <span class="brand-word">大脚板<small>DAJIAOBAN</small></span>
       </a>
-      <nav class="header-nav" aria-label="页面导航"><a href="#idea">设计理念</a><a href="#experience">健康演示</a><a href="#care">草本养护</a></nav>
+      <nav class="header-nav" aria-label="页面导航"><a href="#idea">产品理念</a><a href="#experience">健康演示</a><a href="#guide">使用指南</a><a href="#progress">项目进展</a></nav>
       <a class="header-cta" href="#experience">体验 Demo <span aria-hidden="true">↗</span></a>
     </header>
 
@@ -29,7 +30,7 @@
           <p class="eyebrow hero-eyebrow"><span class="eyebrow-line"></span> EVERY STEP TELLS A STORY <span class="eyebrow-count">001 / 2026</span></p>
           <h1 id="heroTitle">让每一步，<br /><em>都有回响。</em></h1>
           <p class="hero-lead">一双懂得感知的鞋垫，<br />一份真正看得懂的健康洞察。</p>
-          <p class="hero-description">大脚板将足底受力、行走节奏与鞋内环境转化为清晰的日常提示，让关怀从脚下自然发生。</p>
+          <p class="hero-description">从足底受力与行走节奏出发，让细微变化有记录、有解释，也让本人和家人的关怀更有依据。</p>
           <div class="hero-actions"><a class="button-primary" href="#experience">走进健康演示 <span aria-hidden="true">↗</span></a><a class="text-link" href="#idea">了解我们的想法 <span aria-hidden="true">↓</span></a></div>
           <div class="hero-proof"><span class="proof-mark" aria-hidden="true">✳</span><span>智能感知 × 温和养护 × 可解释建议</span></div>
         </div>
@@ -46,17 +47,25 @@
           <div class="section-topline reveal"><span class="section-index">01 / THE IDEA</span><span>一种更自然的健康感知方式</span></div>
           <div class="idea-intro reveal"><h2 id="ideaTitle">从“看见”开始，<br /><em>让关怀更有依据。</em></h2><p>每天的行走都在留下细微线索。我们让鞋垫安静地记录，再把复杂数据翻译成简单、克制、能行动的建议。</p></div>
           <div class="process-grid">
-            <article class="process-step reveal"><span class="step-number">01</span><div class="step-line"></div><span class="step-icon" aria-hidden="true">⌁</span><h3>感知</h3><p>从足底压力、步态、双足温差和鞋内湿度中，读出日常变化。</p><small>SENSE THE SIGNAL</small></article>
+            <article class="process-step reveal"><span class="step-number">01</span><div class="step-line"></div><span class="step-icon" aria-hidden="true">⌁</span><h3>感知</h3><p>V1 从每脚 8 点相对受力和 IMU 运动信号起步，记录着地与行走节奏。</p><small>SENSE THE SIGNAL</small></article>
             <article class="process-step reveal"><span class="step-number">02</span><div class="step-line"></div><span class="step-icon" aria-hidden="true">✳</span><h3>理解</h3><p>与个人近期记录对照，让变化有背景、有解释，而不只是一串数字。</p><small>FIND THE CONTEXT</small></article>
             <article class="process-step reveal"><span class="step-number">03</span><div class="step-line"></div><span class="step-icon" aria-hidden="true">↗</span><h3>行动</h3><p>给出足部观察、休息和穿着建议，帮助用户迈出下一步。</p><small>CARE WITH CLARITY</small></article>
           </div>
+          <div class="use-case-heading reveal"><h3>关怀，发生在日常里。</h3><p>面向中老年人的日常足部观察，也为关心他们的家人提供更清晰的沟通依据。</p></div>
+          <div class="use-case-grid">
+            <article class="use-case reveal"><span class="content-kicker">01 / FOR YOURSELF</span><h4>散步回来，<br />看看今天的变化。</h4><p>脚下的感受有时很难说清。通过近期受力与行走记录，帮助本人回顾变化，留意鞋袜舒适度与活动后的感受。</p><a class="text-link" href="#experience">看看一次状态解读 <span aria-hidden="true">↗</span></a></article>
+            <article class="use-case reveal"><span class="content-kicker">02 / FOR YOUR FAMILY</span><h4>一份关心，<br />多一点具体的依据。</h4><p>未来拟在本人授权后，让家属查看部分趋势与养护记录，聊聊最近的活动和穿着。家属共享属于后续规划，当前尚未开放。</p><a class="text-link" href="#progress">了解服务规划 <span aria-hidden="true">↗</span></a></article>
+          </div>
+          <section class="signal-chain reveal" aria-labelledby="signalTitle"><div class="content-heading"><h3 id="signalTitle">从鞋垫到屏幕，<br />一条清晰的数据链。</h3><span class="phase-label">V1 拟验证链路</span></div><ol class="signal-steps"><li><span>01</span><strong>鞋垫采集</strong><p>每脚 8 点 FSR＋IMU<br />记录受力与运动信号</p></li><li><span>02</span><strong>鞋端处理</strong><p>ESP32 读取与预处理<br />保留设备时间信息</p></li><li><span>03</span><strong>手机同步</strong><p>BLE 接收左右脚数据<br />对齐记录与识别缺包</p></li><li><span>04</span><strong>网页解读</strong><p>展示个人趋势与提示<br />后续研究 AI 分析接口</p></li></ol><p class="chain-note">当前网页由本地模拟数据驱动。实物采集、手机接收与网页实测接入将在原型制作中验证。</p></section>
         </div>
       </section>
 
       <section id="experience" class="experience-section" aria-labelledby="experienceTitle">
         <div class="section-wrap">
-          <div class="experience-intro reveal"><div><span class="section-index light">02 / THE EXPERIENCE</span><h2 id="experienceTitle">数据有迹可循，<br /><em>建议才有依据。</em></h2></div><p>亲自切换不同状态，看看大脚板如何把感知结果变成可以理解的日常行动。</p></div>
+          <div class="experience-intro reveal"><div><span class="section-index light">02 / THE EXPERIENCE</span><h2 id="experienceTitle">数据有迹可循，<br /><em>建议才有依据。</em></h2></div><p>亲自切换三组示例，理解一条足部信号如何进入个人趋势，再形成有依据的日常提示。</p></div>
           <div class="demo-label-row"><div class="live-label"><span class="live-dot"></span> INTERACTIVE PRODUCT DEMO <span class="mock-tag">模拟数据</span></div><span>三种状态 · 四类信号 · 一份清晰解读</span></div>
+          <div class="demo-scope"><p><strong>V1 目标</strong>8 点相对受力与 IMU 运动数据采集</p><p><strong>扩展演示</strong>温差、湿度、规则解读；尚未接入设备或真实 AI</p></div>
+          <ol class="demo-tour" aria-label="演示体验步骤"><li><span>01</span> 选择一种状态</li><li><span>02</span> 点击指标，看变化趋势</li><li><span>03</span> 对照依据，理解建议</li></ol>
           <div class="scenario-switch" role="group" aria-label="选择演示状态"><button type="button" class="scenario-btn is-active" data-scenario="balanced" aria-pressed="true"><span>01</span> 日常平稳</button><button type="button" class="scenario-btn" data-scenario="pressure" aria-pressed="false"><span>02</span> 足底负荷偏高</button><button type="button" class="scenario-btn" data-scenario="temperature" aria-pressed="false"><span>03</span> 足温差异增大</button></div>
 
           <div id="demoShell" class="demo-shell">
@@ -79,22 +88,24 @@
                 <div class="pressure-legend"><span>轻</span><i></i><span>重</span><small>压力分布示意</small></div>
               </div>
               <div class="insight-panel" id="insights">
-                <div class="panel-meta"><span>02 / PERSONAL INSIGHT</span><span>状态解读 · 演示</span></div>
-                <div class="score-lockup"><div><small>今日状态</small><h3 id="stateTitle">整体平稳</h3></div><div class="score-ring"><strong id="stateScore">86</strong><span>/ 100</span></div></div>
+                <div class="panel-meta"><span>02 / PERSONAL INSIGHT</span><span>规则解读 · 示例</span></div>
+                <div class="score-lockup"><div><small>今日状态 · 示例评分</small><h3 id="stateTitle">整体平稳</h3></div><div class="score-ring"><strong id="stateScore">86</strong><span>/ 100</span></div></div>
                 <p class="state-description" id="stateDescription">今日步态与足底受力保持平稳，继续维持舒适的行走节奏。</p>
                 <div class="insight-rule"></div>
                 <p class="insight-heading">我们看到了什么</p>
                 <ul id="insightList" class="insight-list"></ul>
-                <div class="interpretation-note"><span class="note-icon">✳</span><p id="insightBody">鞋垫记录到的步态、受力与足温变化都较平稳。</p></div>
+                <div class="interpretation-note"><span class="note-icon">✳</span><p id="insightBody">当前场景的模拟步态、受力与扩展足温指标变化较平稳。</p></div>
               </div>
             </div>
 
             <div id="sensors" class="metric-rail" aria-label="四类传感指标">
-              <button type="button" class="metric-select" data-metric="pressure" aria-pressed="false"><span class="metric-top"><span>01 / 足底压力</span><span class="metric-arrow">↗</span></span><strong><span id="pressureValue">28.6</span><small>kPa</small></strong><span class="metric-bottom"><span id="pressureStatus">平稳</span><span id="pressureNote">左右受力分布均衡</span></span></button>
-              <button type="button" class="metric-select is-active" data-metric="gait" aria-pressed="true"><span class="metric-top"><span>02 / 步态稳定度</span><span class="metric-arrow">↗</span></span><strong><span id="gaitValue">92</span><small>/ 100</small></strong><span class="metric-bottom"><span id="gaitStatus">稳定</span><span id="gaitNote">步频与步幅保持规律</span></span></button>
-              <button type="button" class="metric-select" data-metric="temperature" aria-pressed="false"><span class="metric-top"><span>03 / 双足温差</span><span class="metric-arrow">↗</span></span><strong><span id="temperatureValue">0.4</span><small>°C</small></strong><span class="metric-bottom"><span id="temperatureStatus">正常</span><span id="temperatureNote">左右足温接近</span></span></button>
-              <button type="button" class="metric-select" data-metric="moisture" aria-pressed="false"><span class="metric-top"><span>04 / 鞋内湿度</span><span class="metric-arrow">↗</span></span><strong><span id="moistureValue">48</span><small>%RH</small></strong><span class="metric-bottom"><span id="moistureStatus">舒适</span><span id="moistureNote">鞋内环境较为干爽</span></span></button>
+              <button type="button" class="metric-select" data-metric="pressure" aria-pressed="false"><span class="metric-top"><span>01 / 相对受力</span><span class="metric-arrow">↗</span></span><span class="metric-scope">原型目标 · 模拟</span><strong><span id="pressureValue">28.6</span><small>/ 100</small></strong><span class="metric-bottom"><span id="pressureStatus">平稳</span><span id="pressureNote">左右受力分布均衡</span></span></button>
+              <button type="button" class="metric-select is-active" data-metric="gait" aria-pressed="true"><span class="metric-top"><span>02 / 步态稳定度</span><span class="metric-arrow">↗</span></span><span class="metric-scope">原型目标 · 模拟</span><strong><span id="gaitValue">92</span><small>/ 100</small></strong><span class="metric-bottom"><span id="gaitStatus">稳定</span><span id="gaitNote">步频与步幅保持规律</span></span></button>
+              <button type="button" class="metric-select" data-metric="temperature" aria-pressed="false"><span class="metric-top"><span>03 / 双足温差</span><span class="metric-arrow">↗</span></span><span class="metric-scope">扩展模拟</span><strong><span id="temperatureValue">0.4</span><small>°C</small></strong><span class="metric-bottom"><span id="temperatureStatus">正常</span><span id="temperatureNote">左右足温接近</span></span></button>
+              <button type="button" class="metric-select" data-metric="moisture" aria-pressed="false"><span class="metric-top"><span>04 / 鞋内湿度</span><span class="metric-arrow">↗</span></span><span class="metric-scope">扩展模拟</span><strong><span id="moistureValue">48</span><small>%RH</small></strong><span class="metric-bottom"><span id="moistureStatus">舒适</span><span id="moistureNote">鞋内环境较为干爽</span></span></button>
             </div>
+
+            <section class="reasoning-panel" aria-labelledby="reasoningTitle"><div class="reasoning-heading"><h3 id="reasoningTitle">每一条建议，都有来处。</h3><span>预设规则与文案演示 · 非真实 AI 输出</span></div><dl class="reasoning-grid" aria-live="polite"><div><dt><span>01</span> 数据依据</dt><dd id="analysisEvidence"></dd></div><div><dt><span>02</span> 影响因素</dt><dd id="analysisContext"></dd></div><div><dt><span>03</span> 行动建议</dt><dd id="analysisAction"></dd></div></dl></section>
 
             <div class="demo-secondary">
               <section class="trend-panel" aria-labelledby="trendHeading">
@@ -102,11 +113,12 @@
                 <div class="trend-title-row"><div><p>变化趋势</p><h3 id="trendHeading">近 7 日步态稳定度</h3></div><div class="range-switch" role="group" aria-label="选择趋势时间范围"><button type="button" data-range="24h" aria-pressed="false">24H</button><button type="button" class="is-active" data-range="7d" aria-pressed="true">7D</button><button type="button" data-range="14d" aria-pressed="false">14D</button></div></div>
                 <div class="chart-area" role="img" aria-label="近 7 日步态稳定度趋势图"><div class="chart-axis"><span id="axisHigh">100</span><span id="axisMiddle">80</span><span id="axisLow">60</span></div><div class="chart-main"><div class="chart-grid"><i></i><i></i><i></i></div><svg id="trendSvg" viewBox="0 0 620 240" preserveAspectRatio="none" aria-hidden="true"><defs><linearGradient id="trendFill" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#95b799" stop-opacity=".28"/><stop offset="1" stop-color="#95b799" stop-opacity="0"/></linearGradient></defs><path id="trendArea" fill="url(#trendFill)"/><path id="trendPath" fill="none" stroke="#3b8063" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><g id="trendDots"></g></svg><div id="chartX" class="chart-labels"></div></div></div>
                 <div class="trend-summary"><p id="trendSummary">近 7 日步态稳定度保持平稳。</p><div><span>平均 <strong id="trendAverage">—</strong></span><span>最高 <strong id="trendMaximum">—</strong></span><span>最低 <strong id="trendMinimum">—</strong></span></div></div>
+                <p id="metricExplanation" class="metric-explanation">0–100 分为界面演示指标，评分算法仍待实测验证。</p>
               </section>
               <section class="next-step-panel" id="actions" aria-labelledby="actionsTitle"><div class="panel-meta"><span>04 / WHAT'S NEXT</span><span>给生活的温和提醒</span></div><h3 id="actionsTitle">下一步，<br /><em>怎么做？</em></h3><p id="insightLead" class="next-step-lead">今天的状态不错，继续保持。</p><ol id="careList" class="care-list"></ol><div class="care-boundary"><span>提示</span><p>分析仅用于日常足部观察，不作为疾病诊断或治疗依据。</p></div></section>
             </div>
 
-            <details id="records" class="records-panel"><summary><span>查看数据记录与近期事件</span><span aria-hidden="true">↗</span></summary><div class="records-content"><div class="records-table-wrap"><table><thead><tr><th scope="col">日期</th><th scope="col">足底压力</th><th scope="col">步态</th><th scope="col">温差</th><th scope="col">湿度</th><th scope="col">状态</th></tr></thead><tbody id="recordsBody"></tbody></table></div><div class="event-column"><h4>近期线索</h4><div id="eventList"></div></div></div></details>
+            <details id="records" class="records-panel"><summary><span>查看模拟记录与近期事件</span><span aria-hidden="true">↗</span></summary><div class="records-content"><div class="records-table-wrap"><table><caption class="records-caption">近 7 日模拟记录 · 温差与湿度为扩展数据</caption><thead><tr><th scope="col">日期</th><th scope="col">相对受力</th><th scope="col">步态评分</th><th scope="col">温差</th><th scope="col">湿度</th><th scope="col">示例状态</th></tr></thead><tbody id="recordsBody"></tbody></table></div><div class="event-column"><h4>近期线索 · 示例</h4><div id="eventList"></div></div></div></details>
           </div>
           <div class="demo-footer-note"><span>当前为交互概念演示。状态分、阈值及建议均未经过临床验证。</span><span>鞋垫采样 → 手机同步 → 授权上传 → 网页解读</span></div>
         </div>
@@ -114,11 +126,54 @@
 
       <section id="care" class="herb-section" aria-labelledby="herbTitle"><div class="section-wrap herb-grid"><figure class="herb-visual reveal"><img class="herb-product-image" src="./assets/herbal-core-concept.webp" width="1254" height="1254" alt="薄型草本无纺布药芯与独立透气织物套的材质概念展示" loading="lazy" decoding="async" /><figcaption class="herb-caption"><span>REPLACEABLE HERBAL CORE</span><span>材质概念 · 安装结构待打样</span></figcaption></figure><div class="herb-copy reveal"><span class="section-index">03 / THE RITUAL</span><h2 id="herbTitle">科技之外，<br /><em>留一点温度。</em></h2><p>可更换草本药芯让日常穿着多一份熟悉的感受。平台关注的是佩戴、清洁与更换提醒；药芯的调理效果仍需独立研究和验证。</p><div class="herb-points"><div><span>01</span><strong>可替换结构</strong><small>便于清洁与更换</small></div><div><span>02</span><strong>温和体验</strong><small>关注皮肤耐受与舒适度</small></div><div><span>03</span><strong>克制建议</strong><small>不自动生成医疗处方</small></div></div></div></div></section>
 
-      <section class="closing-section" aria-labelledby="closingTitle"><div class="section-wrap closing-inner"><span class="section-index light">THE NEXT STEP STARTS HERE</span><h2 id="closingTitle">让健康关怀，<br /><em>从足下开始。</em></h2><a class="closing-link" href="#experience">再体验一次健康解读 <span aria-hidden="true">↗</span></a><div class="closing-mark" aria-hidden="true">足</div></div></section>
+      <section id="guide" class="guide-section" aria-labelledby="guideTitle">
+        <div class="section-wrap">
+          <div class="section-topline reveal"><span class="section-index">04 / GETTING STARTED</span><span>让使用更简单，让信息更清楚</span></div>
+          <div class="content-intro reveal"><h2 id="guideTitle">第一次使用，<br /><em>从这三步开始。</em></h2><p>以下是 V1 计划验证的使用流程。现在无需设备，直接进入上方 Demo，就能体验状态、趋势与建议的变化。</p></div>
+          <ol class="getting-started">
+            <li class="reveal"><span class="start-number">01</span><h3>穿戴与确认</h3><p>选择合适鞋码，确认鞋垫平整、柔性连接片固定、外置电子舱牢靠，再按打样后的操作说明使用。</p><small>原型阶段重点验证佩戴与固定</small></li>
+            <li class="reveal"><span class="start-number">02</span><h3>同步与观察</h3><p>计划通过 BLE 将左右脚信号传到手机，查看记录时间和连接状态，再观察受力分布与行走趋势。</p><small>当前可切换模拟状态体验界面</small></li>
+            <li class="reveal"><span class="start-number">03</span><h3>记录与复看</h3><p>结合实际活动、鞋袜舒适度与个人感受理解变化。后续拟加入观察记录和本人授权的家庭共享。</p><small>长期记录与共享属于后续规划</small></li>
+          </ol>
+          <div class="faq-layout">
+            <div class="faq-intro reveal"><span class="content-kicker">A FEW THINGS TO KNOW</span><h3>你可能还想知道。</h3><p>关于现在能体验什么，以及产品还需要完成哪些验证。</p><a class="text-link" href="#progress">查看项目进展 <span aria-hidden="true">↗</span></a></div>
+            <div class="faq-list reveal">
+              <details class="faq-item"><summary><span>现在可以怎样体验？</span><span class="faq-toggle" aria-hidden="true">+</span></summary><p>切换三种演示状态，点击指标卡和 24H／7D／14D 时间范围，再展开模拟记录。所有数值与建议均为示例，当前未连接鞋垫、手机或真实 AI 服务。</p></details>
+              <details class="faq-item"><summary><span>鞋垫如何连接网页？</span><span class="faq-toggle" aria-hidden="true">+</span></summary><p>V1 计划由每脚 8 点 FSR 与 IMU 采集信号，经 ESP32 和 BLE 传到手机，再供网页展示。实测接入尚未实现；浏览器直接连接的兼容性也需要验证。</p></details>
+              <details class="faq-item"><summary><span>可以把记录分享给家属吗？</span><span class="faq-toggle" aria-hidden="true">+</span></summary><p>当前页面不采集真实健康记录，也未提供账号或家属共享。后续拟由本人选择分享对象与记录范围，并提供撤回授权的入口，让关怀建立在明确同意之上。</p></details>
+              <details class="faq-item"><summary><span>鞋垫怎样清洁和充电？</span><span class="faq-toggle" aria-hidden="true">+</span></summary><p>V1 计划采用可拆表层与外置电子舱，具体方法需随实物打样验证。电子模块应避免浸水；充电时关机、取下模块并停止穿戴，依最终操作说明使用。</p></details>
+              <details class="faq-item"><summary><span>草本药芯已经定型了吗？</span><span class="faq-toggle" aria-hidden="true">+</span></summary><p>药芯目前是可替换材料概念，形状、安装方式、更换周期与皮肤耐受尚待验证。平台拟提供佩戴和更换提醒；调理效果需独立研究，不能作为治疗依据。</p></details>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="progress" class="project-section" aria-labelledby="projectTitle">
+        <div class="section-wrap">
+          <div class="section-topline reveal"><span class="section-index">05 / THE ROAD AHEAD</span><span>一步一步，把想法做实</span></div>
+          <div class="project-layout">
+            <div class="project-intro reveal"><h2 id="projectTitle">从原型，<br /><em>走向日常。</em></h2><p>先验证信号能否稳定记录，再研究舒适佩戴、趋势分析与长期服务。每一步升级，都需要实际数据来回答。</p><div class="project-status"><span class="phase-label">当前阶段</span><strong>网页交互 Demo 已上线</strong><p>V1 硬件已形成设计方案，制作、采集性能与真实行走测试尚待完成。</p></div></div>
+            <ol class="roadmap" aria-label="后续升级路线">
+              <li class="reveal"><span class="roadmap-version">V1</span><div><span class="roadmap-stage">设计方案 / 待制作</span><h3>验证采集闭环</h3><p>双脚各 8 点 FSR＋IMU，验证采样、BLE 通信与左右脚展示；以实物测试记录稳定性和佩戴感受。</p></div></li>
+              <li class="reveal"><span class="roadmap-version">V2</span><div><span class="roadmap-stage">升级规划</span><h3>完善柔性传感结构</h3><p>探索 16／32 点阵列与薄型结构，逐项验证校准、耐弯折和不同鞋型下的读数一致性。</p></div></li>
+              <li class="reveal"><span class="roadmap-version">V3</span><div><span class="roadmap-stage">研究规划</span><h3>研究 AI 步态模型</h3><p>在取得授权、积累可靠样本与标注后，研究可解释的趋势提示，评估模型的泛化能力与误报。</p></div></li>
+              <li class="reveal"><span class="roadmap-version">V4</span><div><span class="roadmap-stage">服务规划</span><h3>形成健康管理服务</h3><p>围绕长期记录、养护提醒与授权共享完善平台；温湿度等扩展信号需补齐硬件并验证后接入。</p></div></li>
+            </ol>
+          </div>
+          <div class="service-intro reveal"><h3>一件产品，连接持续的关怀。</h3><p>产品化方向仍在探索：先验证可用性与需求，再确定服务内容、定价和更换周期。</p></div>
+          <div class="service-grid">
+            <article class="reveal"><span class="content-kicker">01 / HARDWARE</span><h4>智能鞋垫</h4><p>以鞋垫与可拆电子舱为基础，探索硬件销售及维护服务，优先验证稳定采集与舒适佩戴。</p><small>待验证：可靠性、舒适度与制造成本</small></article>
+            <article class="reveal"><span class="content-kicker">02 / MATERIAL</span><h4>可替换药芯</h4><p>探索薄型草本材料与织物套的配套服务，通过打样研究结构、耐受与更换需求。</p><small>待验证：材料、安装与效果边界</small></article>
+            <article class="reveal"><span class="content-kicker">03 / PLATFORM</span><h4>持续记录平台</h4><p>探索个人趋势、养护提醒与授权共享服务，完成实测接入后，再逐步研究 AI 解读。</p><small>待验证：数据接入、权限与使用价值</small></article>
+          </div>
+        </div>
+      </section>
+
+      <section class="closing-section" aria-labelledby="closingTitle"><div class="section-wrap closing-inner"><span class="section-index light">THE NEXT STEP STARTS HERE</span><h2 id="closingTitle">让健康关怀，<br /><em>从足下开始。</em></h2><a class="closing-link" href="#experience">体验一次有依据的解读 <span aria-hidden="true">↗</span></a><div class="closing-mark" aria-hidden="true">足</div></div></section>
     </main>
 
-    <footer class="site-footer"><div class="section-wrap footer-inner"><span>大脚板 · 智能鞋健康管理平台</span><span>省创项目概念原型 / 2026</span><span>每一步，都值得被好好理解。</span></div></footer>
-    <script src="./telemetry.js"></script>
-    <script src="./app.js"></script>
+    <footer class="site-footer"><nav class="section-wrap footer-links" aria-label="页尾导航"><a href="#idea">产品理念</a><a href="#experience">健康演示</a><a href="#care">草本养护</a><a href="#guide">使用指南</a><a href="#progress">项目进展</a></nav><div class="section-wrap footer-inner"><span>大脚板 · 智能鞋健康管理平台</span><span>省创项目概念原型 / 2026</span><span>每一步，都值得被好好理解。</span></div></footer>
+    <script src="./telemetry.js?v=content-1"></script>
+    <script src="./app.js?v=content-1"></script>
   </body>
 </html>

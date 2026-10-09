@@ -2,12 +2,13 @@
 // when a device and backend are available; the UI consumes the same metric keys.
 (function () {
   const metrics = {
-    pressure: { label: '足底压力', unit: 'kPa', low: 15, high: 55, digits: 1, color: '#5683b5' },
-    gait: { label: '步态稳定度', unit: '分', low: 60, high: 100, digits: 0, color: '#3a8f75' },
-    temperature: { label: '双足温差', unit: '°C', low: 0, high: 2.5, digits: 1, color: '#c98956' },
-    moisture: { label: '鞋内湿度', unit: '%RH', low: 30, high: 75, digits: 0, color: '#6799b6' }
+    pressure: { label: '相对受力', unit: '点', low: 0, high: 100, digits: 1, color: '#527d62', explanation: '0–100 为模拟归一化受力指数，仅展示相对变化。FSR 仍需逐点校准，不能据此换算压强或体重。' },
+    gait: { label: '步态稳定度', unit: '分', low: 60, high: 100, digits: 0, color: '#3a8f75', explanation: '0–100 分为界面演示指标。V1 将采集 IMU 与压力时序，步态算法和评分阈值仍待实测验证。' },
+    temperature: { label: '双足温差', unit: '°C', low: 0, high: 2.5, digits: 1, color: '#c98956', explanation: '温差属于平台扩展演示。V1 未配置温度传感器，当前数值不来自设备，也不代表医学判断。' },
+    moisture: { label: '鞋内湿度', unit: '%RH', low: 30, high: 75, digits: 0, color: '#7a9480', explanation: '湿度属于平台扩展演示。后续需增加相应传感器，再验证鞋内环境采样与养护提醒。' }
   };
 
+  // These pressure values are synthetic 0–100 indices, not measured kPa.
   const readings = {
     balanced: {
       pressure: { daily: [31.2, 30.5, 29.8, 30.1, 29.3, 28.9, 29.4, 28.7, 29.1, 28.5, 29.3, 28.8, 29.0, 28.6], hourly: [27.9, 28.4, 28.1, 29.2, 28.7, 29.0, 28.3, 28.6] },
@@ -31,13 +32,13 @@
 
   const events = {
     balanced: [
-      { time: '刚刚', title: '数据同步完成', detail: '四类传感数据已纳入今日概览。', tone: 'normal' },
+      { time: '刚刚', title: '演示记录已更新', detail: '四类模拟指标已纳入今日概览，未连接真实设备。', tone: 'normal' },
       { time: '2 小时前', title: '活动节奏平稳', detail: '近期步态与受力变化较小。', tone: 'normal' },
       { time: '昨日', title: '日常足部检查', detail: '建议继续留意皮肤与鞋袜舒适度。', tone: 'tip' }
     ],
     pressure: [
       { time: '刚刚', title: '右足前掌受力集中', detail: '当前压力较近期水平升高，请查看局部是否不适。', tone: 'attention' },
-      { time: '3 小时前', title: '今日活动量增加', detail: '步数已高于演示用户的近期水平。', tone: 'tip' },
+      { time: '3 小时前', title: '受力趋势持续上升', detail: '最近几组示例读数逐步升高，可查看趋势与记录。', tone: 'tip' },
       { time: '昨日', title: '步态变化开始出现', detail: '稳定度连续几日略有下降。', tone: 'normal' }
     ],
     temperature: [

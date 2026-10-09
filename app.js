@@ -7,7 +7,9 @@ const scenarios = {
     description: '今日步态与足底受力保持平稳，继续维持舒适的行走节奏。',
     foot: '左右足的压力分布接近，前掌与足跟受力均匀。',
     lead: '今天的状态不错，继续保持。',
-    body: '鞋垫记录到的步态、受力与足温变化都较平稳。',
+    body: '当前场景的模拟步态、受力与扩展足温指标变化较平稳。',
+    context: '这组示例的受力与行走节奏变化较小。连续记录比一次读数更有助于理解个人变化。',
+    action: '继续观察行走感受，并结合鞋袜舒适度、皮肤外观和后续记录一起复看。',
     metrics: {
       pressure: ['平稳', '左右受力分布均衡'],
       gait: ['稳定', '步频与步幅保持规律'],
@@ -22,15 +24,17 @@ const scenarios = {
     title: '留意足底负荷',
     description: '右足前掌受力较近期集中，今天可以放慢脚步。',
     foot: '右足前掌出现较集中的受力区域，请关注局部摩擦与不适。',
-    lead: '今天走得较多，给双脚一点休息。',
+    lead: '今天的受力有所变化，先看看穿着和感受。',
     body: '受力变化可能与活动量、鞋袜贴合度等因素有关，建议先检查穿着并安排休息。',
     metrics: {
       pressure: ['偏高', '右足前掌受力集中'],
-      gait: ['略有波动', '后半日步幅变短'],
+      gait: ['略有波动', '示例评分逐步下降'],
       temperature: ['正常', '左右足温接近'],
       moisture: ['略偏高', '建议保持鞋袜干爽']
     },
-    insights: ['右足前掌局部压力高于演示用户近期水平。', '今天活动量增加，后半日的步幅稍有变化。', '如果局部疼痛、红肿或破损持续，请咨询专业医护人员。'],
+    context: '穿着贴合度、活动量和采样条件都可能影响受力。单一读数不能确定原因，也不能识别疾病。',
+    action: '先检查鞋袜和局部不适，安排休息，再在相似条件下比较记录；持续不适时寻求专业评估。',
+    insights: ['右足前掌相对受力高于演示用户近期水平。', '这组示例的受力上升，同时步态评分有所下降。', '如果局部疼痛、红肿或破损持续，请咨询专业医护人员。'],
     care: [['分段休息', '避免长时间连续步行，活动间隙给双脚放松。'], ['检查受力位置', '查看右足前掌有无磨红、压痕或鞋内异物。'], ['调整鞋袜', '选择合脚、透气的鞋袜；不适持续时寻求专业评估。']]
   },
   temperature: {
@@ -39,7 +43,9 @@ const scenarios = {
     description: '双足局部温差较近期增大，建议复测并观察皮肤状态。',
     foot: '足底受力整体平稳，局部温度变化需要结合足部外观观察。',
     lead: '足温差异有变化，建议今天再看一眼。',
-    body: '环境温度、穿着与活动也会影响读数，建议在相似条件下复测，并观察皮肤状态。',
+    body: '这是未来温度模块的扩展示例，当前 V1 不采集足温。场景用于演示复看趋势与观察皮肤的提示流程。',
+    context: '温差属于扩展模拟，V1 尚未采集。未来需要结合环境、穿着和活动背景，验证重复测量的一致性。',
+    action: '演示如何从一次变化进入趋势复看，并关注实际感受；读数不能替代专业评估。',
     metrics: {
       pressure: ['平稳', '整体受力较均衡'],
       gait: ['稳定', '行走节奏基本规律'],
@@ -115,6 +121,7 @@ function renderTrend() {
   const rangeName = state.range === '24h' ? '近 24 小时' : state.range === '14d' ? '近 14 日' : '近 7 日';
   setText('trendHeading', `${rangeName}${config.label}`);
   setText('trendGranularity', state.range === '24h' ? '每 3 小时样例' : '每日日均');
+  setText('metricExplanation', config.explanation);
   const format = number => number.toFixed(config.digits);
   setText('trendAverage', `${format(values.reduce((sum, value) => sum + value, 0) / values.length)} ${config.unit}`);
   setText('trendMaximum', `${format(Math.max(...values))} ${config.unit}`);
@@ -139,9 +146,24 @@ function renderTrend() {
 function renderRecords() {
   byId('recordsBody').innerHTML = telemetry.getRecords(state.scenario).map(record => {
     const attention = record.pressure > 40 || record.gait < 86 || record.temperature > 1.2;
-    return `<tr><td>${record.date}</td><td>${record.pressure.toFixed(1)} kPa</td><td>${record.gait} 分</td><td>${record.temperature.toFixed(1)} °C</td><td>${record.moisture} %RH</td><td><span class="record-status ${attention ? 'attention' : ''}">${attention ? '留意变化' : '平稳'}</span></td></tr>`;
+    return `<tr><td>${record.date}</td><td>${record.pressure.toFixed(1)} / 100</td><td>${record.gait} 分</td><td>${record.temperature.toFixed(1)} °C</td><td>${record.moisture} %RH</td><td><span class="record-status ${attention ? 'attention' : ''}">${attention ? '留意变化' : '平稳'}</span></td></tr>`;
   }).join('');
   byId('eventList').innerHTML = telemetry.getEvents(state.scenario).map(event => `<div class="event-item ${event.tone}"><span class="event-dot"></span><div class="event-top"><strong>${event.title}</strong><time>${event.time}</time></div><p>${event.detail}</p></div>`).join('');
+}
+
+function renderReasoning() {
+  const metric = state.scenario === 'balanced' ? 'gait' : state.scenario;
+  const config = telemetry.metrics[metric];
+  const values = telemetry.getSeries(state.scenario, metric, '7d').values;
+  const previous = values.slice(0, -1);
+  const baseline = previous.reduce((sum, value) => sum + value, 0) / previous.length;
+  const latest = values[values.length - 1];
+  const difference = latest - baseline;
+  const digits = metric === 'gait' ? 1 : config.digits;
+  const direction = difference >= 0 ? '高' : '低';
+  setText('analysisEvidence', `${config.label}今日样例为 ${latest.toFixed(config.digits)} ${config.unit}，较前 6 日平均 ${baseline.toFixed(digits)} ${config.unit}${direction} ${Math.abs(difference).toFixed(digits)} ${config.unit}。`);
+  setText('analysisContext', scenarios[state.scenario].context);
+  setText('analysisAction', scenarios[state.scenario].action);
 }
 
 function renderScenario(key, initial = false) {
@@ -182,6 +204,7 @@ function renderScenario(key, initial = false) {
   });
   renderTrend();
   renderRecords();
+  renderReasoning();
 }
 
 const now = new Date();
