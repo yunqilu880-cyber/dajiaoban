@@ -1,0 +1,30 @@
+{
+  "records": [
+    {
+      "id": "GaCo01_01",
+      "label": "公开记录 A",
+      "group": "原数据集对照组",
+      "file": "GaCo01_01.txt",
+      "url": "./data/gaitpdb/GaCo01_01.txt",
+      "source": "PhysioNet · Gait in Parkinson’s Disease v1.0.0",
+      "sourceUrl": "https://physionet.org/files/gaitpdb/1.0.0/GaCo01_01.txt",
+      "sha256": "81bcedc0f72c1c6804d7830627431a6c1b76e9ddb42de0cf1ae2f418848c13a4",
+      "nominalHz": 100,
+      "samples": 12119,
+      "duration": 121.1715
+    },
+    {
+      "id": "GaPt03_01",
+      "label": "公开记录 B",
+      "group": "原数据集患者组",
+      "file": "GaPt03_01.txt",
+      "url": "./data/gaitpdb/GaPt03_01.txt",
+      "source": "PhysioNet · Gait in Parkinson’s Disease v1.0.0",
+      "sourceUrl": "https://physionet.org/files/gaitpdb/1.0.0/GaPt03_01.txt",
+      "sha256": "e2e55fb21fa64392eaa924005c5615ce1fac690d7d52f078404ec3ff7e2c7f3d",
+      "nominalHz": 100,
+      "samples": 12119,
+      "duration": 121.1715
+    }
+  ]
+}

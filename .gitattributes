@@ -1,0 +1,2 @@
+# Preserve downloaded source bytes: browser SHA-256 must match public originals.
+data/gaitpdb/*.txt -text -whitespace
