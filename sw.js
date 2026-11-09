@@ -1,5 +1,5 @@
-const CACHE='zuyuankang-v2-20261109-a';
-const FILES=['./','index.html','workspace.html','research.html','product.html','concept.html','styles.css','content.css','site.css','workspace.css','site.js','scripts/gait.mjs','scripts/workspace.mjs','app.js?v=content-1','telemetry.js?v=content-1','favicon.svg','assets/smart-insole-v1.webp','assets/herbal-core-concept.webp','data/records.json','data/gaitpdb/GaCo01_01.txt','data/gaitpdb/GaPt03_01.txt','data/gaitpdb/format.txt','data/gaitpdb/LICENSE-ODC-By-1.0.txt'];
+const CACHE='zuyuankang-studio-20261109-b';
+const FILES=['./','index.html','workspace.html','research.html','product.html','concept.html','styles.css','content.css','site.css?v=studio-3','workspace.css?v=studio-3','site.js','scripts/gait.mjs','scripts/workspace.mjs','app.js?v=content-1','telemetry.js?v=content-1','favicon.svg','assets/smart-insole-v1.webp','assets/herbal-core-concept.webp','data/records.json','data/gaitpdb/GaCo01_01.txt','data/gaitpdb/GaPt03_01.txt','data/gaitpdb/format.txt','data/gaitpdb/LICENSE-ODC-By-1.0.txt'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(FILES.map(file=>new URL(file,self.registration.scope).href))).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith('zuyuankang-')&&key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{
