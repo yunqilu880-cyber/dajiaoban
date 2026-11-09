@@ -1,4 +1,5 @@
-import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segmentCSV,buildReport,digestBytes} from './gait.mjs';
+import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segmentCSV,buildReport,digestBytes,segmentEvents} from './gait.mjs?v=analysis-4';
+import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=analysis-4';
 
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
@@ -9,11 +10,23 @@ const svgNS='http://www.w3.org/2000/svg';
 const state={record:null,analysis:null,cursor:0,playing:false,speed:1,selected:null,view:'full',lastFrame:0,lastPaint:0,tour:-1,token:0};
 const geometry={width:900,height:280,left:56,top:22,right:884,bottom:232};
 const cached=new Map();let manifest=[],controller=null;
+const explorer=createExplorer({
+  locate(time,point,full=false){
+    if(!state.record)return;
+    pause();if(point)state.selected=point;
+    if(full)setView('full');else drawPlot();
+    if(time!==undefined)setCursor(time);else renderFrame();
+    $('chartArea').scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+  },
+  onRange(start,end){$('segmentStart').value=start;$('segmentEnd').value=end;applySegment();},
+  onEvents(){if(state.record){$('showEvents').checked=true;drawPlot();}}
+});
 
 function status(message,error=false){text('workspaceStatus',message);$('workspaceStatus').classList.toggle('is-error',error);}
 function enable(ready){
   ['playButton','restartButton','seekRange','applySegment','resetSegment','exportCSV','reportButton','peakLink','viewFull','viewSegment','segmentStart','segmentEnd'].forEach(id=>{$(id).disabled=!ready;});
   $('workspaceBoard').classList.toggle('is-loading',!ready);
+  explorer.setReady(ready);
 }
 function pause(){state.playing=false;$('playButton').textContent='▶ 开始回放';$('playButton').setAttribute('aria-pressed','false');}
 function resetDisplay(){
@@ -21,6 +34,7 @@ function resetDisplay(){
   ['forcePathL','forcePathR','forcePathPoint'].forEach(id=>$(id).setAttribute('d',''));
   text('analysisRange','等待片段分析');text('evidenceText','记录尚未加载完成。');text('pointValue','—');
   $('reportDialog').close();
+  explorer.reset();$('plotEventMarkers').innerHTML='';
 }
 
 function createPoints(){
@@ -53,7 +67,7 @@ async function loadRecord(id){
       if(!response.ok)throw new Error(`记录读取失败（HTTP ${response.status}）。`);
       const bytes=await response.arrayBuffer(),sha256=await digestBytes(bytes);
       if(sha256&&sha256!==meta.sha256)throw new Error('文件校验与公开样本清单不一致，请重新加载。');
-      record=parseGaitText(new TextDecoder('utf-8',{fatal:true}).decode(bytes),{...meta,sha256:sha256||meta.sha256,local:false});
+      record=parseGaitText(new TextDecoder('utf-8',{fatal:true}).decode(bytes),{...meta,sha256:sha256||meta.sha256,local:false,integrity:sha256?'verified':'unavailable'});
       cached.set(id,record);
     }
     if(token!==state.token)return;
@@ -66,6 +80,7 @@ async function loadRecord(id){
 
 function setRecord(record){
   pause();state.record=record;state.selected=null;state.view='full';
+  explorer.setRecord(record);
   const end=Math.min(20,record.duration),start=record.duration>20?10:0;
   state.cursor=start;$('segmentStart').value=start;$('segmentEnd').value=end;
   $('segmentStart').max=record.duration;$('segmentEnd').max=record.duration;
@@ -80,7 +95,7 @@ function setRecord(record){
   text('modeNote',record.local?'本地文件分析':'公开数据回放');
   document.querySelector('.mode-title .subtle').textContent=record.local?'PhysioNet兼容格式':'PhysioNet / v1.0.0';
   text('recordOrigin',`${record.local?'本地文件':'公开数据'}：${record.file} · ${record.source}`);
-  text('qualityDetail',`检查：${record.rows.length}行、19列有限数值，时间严格递增；相对中位采样间隔有${record.quality.timeVariations}处微小差异，${record.quality.gaps}处间隔超过中位值1.5倍；${record.quality.totalMismatch}行的总受力与8点合计差异超过0.15 N。首样本原时间为${number(record.origin,4)}秒，回放以该时刻为0秒，导出CSV保留原时间列。${record.local?'导入文件来源、单位与采集条件由导入者确认。':'原始点位及分组来自公开数据集，不代表我们的自制鞋垫或用户疾病判断。'}`);
+  text('qualityDetail',`检查：${record.rows.length}行、19列有限数值，时间严格递增；有${record.quality.timeVariations}个间隔偏离中位采样间隔，${record.quality.gaps}处间隔超过中位值1.5倍；${record.quality.totalMismatch}行的总受力与8点合计差异超过0.15 N。首样本原时间为${number(record.origin,4)}秒，回放以该时刻为0秒，导出CSV保留原时间列。${record.local?'导入文件来源、单位与采集条件由导入者确认。':'原始点位及分组来自公开数据集，不代表我们的自制鞋垫或用户疾病判断。'}`);
   text('segmentError','');$('retryLoad').hidden=true;enable(true);
   status(record.local?'本地文件已读取，仅在当前浏览器分析。':'真实公开记录已校验 · 点击播放或拖动时间轴，观察双脚信号。');
   applySegment(false);setView('segment');if(state.analysis)setCursor(state.analysis.start);renderFrame();
@@ -104,6 +119,7 @@ function renderFrame(){
   $('pointSelect').value=state.selected||'';
   text('pointName',selected?`${selected.side==='L'?'左脚':'右脚'} ${selected.id} · 当前点位受力`:'点击点位，查看局部信号');
   text('pointValue',selected?`${number(row[selected.column])} N`:'—');$('clearPoint').hidden=!selected;
+  explorer.updateSelection(state.selected);
   const [a,b]=viewBounds(),inView=state.cursor>=a&&state.cursor<=b;
   ['plotCursor','cursorL','cursorR'].forEach(id=>{$(id).style.visibility=inView?'visible':'hidden';});
   if(inView){const x=plotX(state.cursor,a,b);$('plotCursor').setAttribute('x1',x);$('plotCursor').setAttribute('x2',x);
@@ -137,6 +153,8 @@ function drawPlot(){
   text('selectedLegendName',selected?`${selected.id} 局部受力`:'选中点位');
   if(state.analysis){const x1=plotX(Math.max(a,state.analysis.start),a,b),x2=plotX(Math.min(b,state.analysis.end),a,b);$('selectionShade').setAttribute('x',x1);$('selectionShade').setAttribute('width',Math.max(0,x2-x1));}
   text('plotCaption',`${state.view==='full'?'全程':'放大片段'} ${number(a,2)}–${number(b,2)} s · 阴影为分析片段 · 图形按区间极值抽样，统计使用完整采样。`);
+  const markers=$('showEvents').checked?segmentEvents(record,{requestedStart:a,requestedEnd:b}):[];
+  $('plotEventMarkers').innerHTML=markers.map(event=>`<path d="M${plotX(event.time,a,b)} ${geometry.bottom-13}V${geometry.bottom}" class="candidate-marker ${event.side==='L'?'left':'right'}"/>`).join('');
 }
 
 function setView(view){state.view=view;$('viewFull').setAttribute('aria-pressed',String(view==='full'));$('viewSegment').setAttribute('aria-pressed',String(view==='segment'));drawPlot();renderFrame();}
@@ -151,6 +169,7 @@ function applySegment(seek=true){
     text('metricEvents',`${a.leftEvents} / ${a.rightEvents}`);
     text('evidenceText',`在这段记录中，双脚总受力相加的最高值为 ${number(a.peakSum)} N，出现在 ${number(a.peakTime,2)} s。点击定位，核对该时刻的点位与波形。`);
     text('analysisHint',`实际样本范围 ${number(a.start,4)}–${number(a.end,4)} s；${a.samples}条原始采样。统计与图形显示抽样分开处理。`);
+    explorer.update(state.record,a);
     drawPlot();if(seek){pause();setCursor(a.start);}else renderFrame();
   }catch(error){text('segmentError',`${error.message} 当前结果保持上次有效片段。`);}
 }
@@ -175,11 +194,12 @@ function download(content,type,name){
   const url=URL.createObjectURL(new Blob([content],{type})),link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 function fileStem(){return `${state.record.id}_${state.analysis.requestedStart.toFixed(2)}-${state.analysis.requestedEnd.toFixed(2)}s`;}
+function currentReport(){return buildReport(state.record,state.analysis,explorer.comparison());}
 function reportMarkup(){
-  const report=buildReport(state.record,state.analysis),a=report.segment;
-  return `<div class="report-provenance"><span class="source-pill">${escape(report.mode)}</span><p>${escape(report.record.source)}<br>记录：${escape(report.record.file)} · 原始受力单位 N</p><p>回放以首样本为0秒；首样本原始时间 ${number(report.record.timeOrigin,4)} s，CSV保留原始时间列。</p></div><dl class="report-facts"><div><dt>请求片段</dt><dd>${number(a.requestedStart,2)}–${number(a.requestedEnd,2)} s</dd></div><div><dt>实际采样范围</dt><dd>${number(a.start,4)}–${number(a.end,4)} s</dd></div><div><dt>参与统计采样</dt><dd>${a.samples}条</dd></div><div><dt>方法版本</dt><dd>${escape(report.method.version)}</dd></div></dl><table><thead><tr><th>观察项</th><th>左脚</th><th>右脚</th></tr></thead><tbody><tr><td>采样均值</td><td>${number(a.leftMean)} N</td><td>${number(a.rightMean)} N</td></tr><tr><td>总受力峰值</td><td>${number(a.leftPeak)} N</td><td>${number(a.rightPeak)} N</td></tr><tr><td>受力积分占比</td><td>${a.leftShare===null?'—':number(a.leftShare*100)+'%'}</td><td>${a.rightShare===null?'—':number(a.rightShare*100)+'%'}</td></tr><tr><td>候选触地次数</td><td>${a.leftEvents}</td><td>${a.rightEvents}</td></tr></tbody></table><h3>关键证据</h3><p>双脚总受力相加最高值 ${number(a.peakSum)} N，发生在 ${number(a.peakTime,2)} s。可在工作台定位该帧复查。</p><h3>方法与范围</h3><p>${escape(report.method.summary)}</p><p>${escape(report.method.contact)}</p><p>${escape(report.method.boundaries)}</p><div class="report-source"><strong>来源与追溯</strong><p>${report.record.sourceUrl?escape(report.record.sourceUrl):'本地文件，来源与单位由导入者确认。'}</p><p>SHA-256：${escape(report.record.sha256||'当前环境未计算')}</p><p>生成时间：${escape(new Date(report.generatedAt).toLocaleString('zh-CN'))} · 公开数据背景及许可见研究与验证页。本报告不是疾病诊断。</p></div>`;
+  const report=currentReport(),a=report.segment;
+  return `<div class="report-provenance"><span class="source-pill">${escape(report.mode)}</span><p>${escape(report.record.source)}<br>记录：${escape(report.record.file)} · 原始受力单位 N</p><p>回放以首样本为0秒；首样本原始时间 ${number(report.record.timeOrigin,4)} s，CSV保留原始时间列。</p></div><dl class="report-facts"><div><dt>请求片段</dt><dd>${number(a.requestedStart,2)}–${number(a.requestedEnd,2)} s</dd></div><div><dt>实际采样范围</dt><dd>${number(a.start,4)}–${number(a.end,4)} s</dd></div><div><dt>参与统计采样</dt><dd>${a.samples}条</dd></div><div><dt>方法版本</dt><dd>${escape(report.method.version)}</dd></div></dl><table><thead><tr><th>观察项</th><th>左脚</th><th>右脚</th></tr></thead><tbody><tr><td>采样均值</td><td>${number(a.leftMean)} N</td><td>${number(a.rightMean)} N</td></tr><tr><td>总受力峰值</td><td>${number(a.leftPeak)} N</td><td>${number(a.rightPeak)} N</td></tr><tr><td>受力积分占比</td><td>${a.leftShare===null?'—':number(a.leftShare*100)+'%'}</td><td>${a.rightShare===null?'—':number(a.rightShare*100)+'%'}</td></tr><tr><td>候选触地次数</td><td>${a.leftEvents}</td><td>${a.rightEvents}</td></tr></tbody></table>${reportDetailsMarkup(report)}<h3>方法与范围</h3><p>${escape(report.method.summary)}</p><p>${escape(report.method.contact)}</p><p>${escape(report.method.boundaries)}</p><div class="report-source"><strong>来源与追溯</strong><p>${report.record.sourceUrl?escape(report.record.sourceUrl):'本地文件，来源与单位由导入者确认。'}</p><p>SHA-256：${escape(report.record.sha256||'当前环境未计算')}</p><p>生成时间：${escape(new Date(report.generatedAt).toLocaleString('zh-CN'))} · 公开数据背景及许可见研究与验证页。本报告不是疾病诊断。</p></div>`;
 }
-function openReport(){if(!state.analysis)return;pause();$('reportContent').innerHTML=reportMarkup();$('printReportRoot').innerHTML='<h1>足元康｜足底受力片段观察报告</h1>'+reportMarkup();$('reportDialog').showModal();}
+function openReport(){if(!state.analysis)return;pause();const markup=reportMarkup();$('reportContent').innerHTML=markup;$('printReportRoot').innerHTML='<h1>足元康｜足底受力片段观察报告</h1>'+markup;$('printReportRoot').querySelectorAll('details').forEach(node=>{node.open=true;});$('reportDialog').showModal();}
 
 const tour=[
   ['选择一份真实记录','从两份公开样本中选择。先看来源、单位和记录时长，再开始回放。','recordArea'],
@@ -201,6 +221,7 @@ $('seekRange').addEventListener('input',event=>setCursor(Number(event.target.val
 $('applySegment').addEventListener('click',()=>applySegment());
 $('resetSegment').addEventListener('click',()=>{if(!state.record)return;$('segmentStart').value=0;$('segmentEnd').value=state.record.duration;applySegment();});
 $('viewFull').addEventListener('click',()=>setView('full'));$('viewSegment').addEventListener('click',()=>setView('segment'));
+$('showEvents').addEventListener('change',drawPlot);
 $('clearPoint').addEventListener('click',()=>{state.selected=null;drawPlot();renderFrame();});
 $('pointSelect').addEventListener('change',event=>{state.selected=event.target.value||null;drawPlot();renderFrame();});
 $('wavePlot').addEventListener('click',event=>{
@@ -213,7 +234,7 @@ $('recordSelect').addEventListener('change',event=>loadRecord(event.target.value
 $('retryLoad').addEventListener('click',()=>loadRecord($('recordSelect').value));
 $('exportCSV').addEventListener('click',()=>{download(segmentCSV(state.record,state.analysis),'text/csv;charset=utf-8',`${fileStem()}.csv`);status('片段CSV已生成，可在浏览器下载记录中查看。');});
 $('reportButton').addEventListener('click',openReport);$('closeReport').addEventListener('click',()=>$('reportDialog').close());
-$('downloadReportJSON').addEventListener('click',()=>download(JSON.stringify(buildReport(state.record,state.analysis),null,2),'application/json',`${fileStem()}_report.json`));
+$('downloadReportJSON').addEventListener('click',()=>download(JSON.stringify(currentReport(),null,2),'application/json',`${fileStem()}_report.json`));
 $('printReportButton').addEventListener('click',()=>window.print());
 $('focusMode').addEventListener('click',()=>{const active=document.body.classList.toggle('workspace-focus');$('focusMode').setAttribute('aria-pressed',String(active));text('focusMode',active?'退出专注模式 ↙':'专注模式 ↗');if(active)$('workspaceBoard').scrollIntoView({block:'start',behavior:'instant'});});
 $('tourStart').addEventListener('click',()=>{state.tour=0;showTour();});
@@ -228,6 +249,7 @@ $('importFile').addEventListener('change',async event=>{
     if(file.size>10*1024*1024)throw new Error('文件超过10 MB，请先截取一段记录。');
     const bytes=await file.arrayBuffer();const content=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
     const record=parseGaitText(content,{id:file.name.replace(/\.[^.]+$/,'').replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,60)||'local-record',file:file.name,source:'本地导入 · PhysioNet兼容19列格式',local:true,sha256:await digestBytes(bytes)});
+    record.integrity=record.sha256?'computed':'unavailable';
     if(token!==state.token)return;
     cached.set('local',record);let option=$('recordSelect').querySelector('option[value="local"]');
     if(!option){option=new Option('','local');$('recordSelect').add(option);}option.textContent=`本地 · ${file.name}`;$('recordSelect').value='local';setRecord(record);

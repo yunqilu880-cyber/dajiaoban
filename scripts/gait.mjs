@@ -1,6 +1,6 @@
 // Original, browser-side analysis for PhysioNet-compatible 19-column records.
 // Inputs remain in seconds and Newtons; render sampling never affects statistics.
-export const METHOD_VERSION = 'ZYK-GAIT-0.1';
+export const METHOD_VERSION = 'ZYK-GAIT-0.2';
 export const CSV_HEADERS = ['time_s', ...Array.from({length:8},(_,i)=>`L${i+1}_N`), ...Array.from({length:8},(_,i)=>`R${i+1}_N`), 'Ltotal_N', 'Rtotal_N'];
 export const POINTS = [
   ...[[-500,-800],[-700,-400],[-300,-400],[-700,0],[-300,0],[-700,400],[-300,400],[-500,800]].map(([x,y],i)=>({id:`L${i+1}`,side:'L',column:i+1,x,y})),
@@ -96,6 +96,79 @@ export function analyseSegment(record,start,end) {
     rightEvents:record.events.right.filter(event=>event.time>=start&&event.time<=end).length};
 }
 
+export function analysePoints(record, analysis) {
+  const points=POINTS.map(point=>{
+    let sum=0,peak=-Infinity,peakIndex=analysis.from;
+    for(let i=analysis.from;i<analysis.to;i++){
+      const value=record.rows[i][point.column];sum+=value;
+      if(value>peak){peak=value;peakIndex=i;}
+    }
+    return {id:point.id,side:point.side,column:point.column,mean:sum/analysis.samples,peak,
+      peakTime:record.rows[peakIndex][0]-record.origin};
+  });
+  return points.sort((a,b)=>b.mean-a.mean||a.column-b.column).map((point,i)=>({...point,rank:i+1}));
+}
+
+export function segmentEvents(record, analysis) {
+  return [['left','L',17],['right','R',18]].flatMap(([key,side,column])=>
+    record.events[key].filter(event=>event.time>=analysis.requestedStart&&event.time<=analysis.requestedEnd)
+      .map(event=>({side,time:event.time,index:event.index,force:record.rows[event.index][column]}))
+  ).sort((a,b)=>a.time-b.time||a.side.localeCompare(b.side));
+}
+
+export function qualityDiagnostics(record) {
+  let minDt=Infinity,maxDt=0;
+  const gapExamples=[],mismatchExamples=[];
+  for(let i=0;i<record.rows.length;i++){
+    const row=record.rows[i],time=row[0]-record.origin;
+    if(i){
+      const dt=row[0]-record.rows[i-1][0];minDt=Math.min(minDt,dt);maxDt=Math.max(maxDt,dt);
+      if(dt>record.medianDt*1.5&&gapExamples.length<20)gapExamples.push({time,index:i,dt,previousTime:record.rows[i-1][0]-record.origin});
+    }
+    const leftDifference=row.slice(1,9).reduce((s,v)=>s+v,0)-row[17];
+    const rightDifference=row.slice(9,17).reduce((s,v)=>s+v,0)-row[18];
+    if((Math.abs(leftDifference)>.15||Math.abs(rightDifference)>.15)&&mismatchExamples.length<20)
+      mismatchExamples.push({time,index:i,leftDifference,rightDifference});
+  }
+  return {scope:'整份记录',rows:record.rows.length,columns:19,finiteValues:true,nonnegativeForces:true,strictlyIncreasingTime:true,
+    minDt,maxDt,medianDt:record.medianDt,timeVariations:record.quality.timeVariations,gaps:record.quality.gaps,
+    totalMismatch:record.quality.totalMismatch,gapThreshold:record.medianDt*1.5,totalToleranceN:.15,
+    examplesLimit:20,gapExamples,mismatchExamples};
+}
+
+export function interpretSegment(analysis, points) {
+  const n=(value,digits=1)=>Number(value.toFixed(digits)).toFixed(digits);
+  let distribution;
+  if(analysis.leftShare===null){
+    distribution='片段内双脚总受力积分为0，无法计算左右占比。请核对原始信号与采集条件。';
+  }else{
+    const difference=(analysis.leftShare-analysis.rightShare)*100;
+    const differenceText=Math.abs(difference)<.005?'两侧占比在0.01个百分点显示精度下相同。':`${difference>0?'左':'右'}侧高${n(Math.abs(difference),2)}个百分点（按未舍入占比计算）。`;
+    distribution=`左脚受力积分占比${n(analysis.leftShare*100)}%，右脚${n(analysis.rightShare*100)}%。${differenceText}占比描述当前片段的受力分配，不设医学正常阈值。`;
+  }
+  const top=points[0];
+  return [
+    {id:'distribution',title:'左右受力分配',text:distribution},
+    {id:'peak',title:'双脚合计峰值',text:`片段内双脚总受力相加最高为${n(analysis.peakSum)} N，出现在${n(analysis.peakTime,2)}秒。可定位该帧，核对点位与曲线。`,time:analysis.peakTime},
+    {id:'point',title:'点位均值排序',text:top.mean>0?`16点中，${top.id}的采样均值最高，为${n(top.mean)} N；该点峰值${n(top.peak)} N，出现在${n(top.peakTime,2)}秒。排序用于定位信号特征，不代表病变部位。`:'16个点位的采样均值均为0，没有可区分的最高点。请核对原始信号。',point:top.id,time:top.peakTime}
+  ];
+}
+
+export function compareSegments(a,b) {
+  const fields=[['leftMean','左脚采样均值','N',1],['rightMean','右脚采样均值','N',1],
+    ['peakSum','双脚合计峰值','N',1],['leftShare','左脚受力积分占比','%',100]];
+  return {direction:'B − A',a:{...a},b:{...b},
+    sameWindow:a.from===b.from&&a.to===b.to,
+    overlapSeconds:Math.max(0,Math.min(a.end,b.end)-Math.max(a.start,b.start)),
+    differentDuration:Math.abs((a.requestedEnd-a.requestedStart)-(b.requestedEnd-b.requestedStart))>1e-7,
+    metrics:fields.map(([key,label,unit,scale])=>{
+      const before=a[key]===null?null:a[key]*scale,after=b[key]===null?null:b[key]*scale;
+      return {key,label,unit,a:before,b:after,delta:before===null||after===null?null:after-before,
+        deltaUnit:unit==='%'?'个百分点':unit,
+        relativeChange:unit==='%'||before===null||after===null||before===0?null:(after-before)/before*100};
+    })};
+}
+
 // Preserve each bucket's extrema in timestamp order for display only.
 export function envelope(rows,from,to,column,budget=700) {
   const length=to-from;
@@ -116,13 +189,16 @@ export function segmentCSV(record,analysis) {
   return '\uFEFF'+CSV_HEADERS.join(',')+'\r\n'+record.rows.slice(analysis.from,analysis.to).map(row=>row.join(',')).join('\r\n');
 }
 
-export function buildReport(record,analysis) {
+export function buildReport(record,analysis,comparison=null) {
+  const points=analysePoints(record,analysis);
   return {title:'足元康｜足底受力片段观察报告',generatedAt:new Date().toISOString(),
     mode:record.local?'本地文件分析':'公开数据回放',record:{id:record.id,file:record.file,source:record.source,
-      sourceUrl:record.sourceUrl||null,sha256:record.sha256||null,unit:'N',timeUnit:'s',timeOrigin:record.origin,
+      sourceUrl:record.sourceUrl||null,sha256:record.sha256||null,integrity:record.integrity||'not-recorded',unit:'N',timeUnit:'s',timeOrigin:record.origin,
       timeline:'回放与选段相对首样本计时；CSV保留原始时间列。',samples:record.rows.length,duration:record.duration},
-    segment:analysis,quality:record.quality,method:{version:METHOD_VERSION,
-      summary:'采样均值；原时间轴上的梯形积分；双脚总受力峰值。',
+    segment:analysis,quality:record.quality,pointStatistics:points,interpretation:interpretSegment(analysis,points),
+    candidateEvents:segmentEvents(record,analysis),qualityChecks:qualityDiagnostics(record),comparison,
+    method:{version:METHOD_VERSION,
+      summary:'采样均值；原时间轴上的梯形积分；双脚总受力峰值；各点均值排序及首次峰值时间。片段对比采用同一记录内B减A，比例差以百分点表示。',
       contact:'候选触地：5点移动均值；各脚全记录峰值的10%进入、5%退出；同脚事件间隔至少0.25秒；未验证识别准确率。',
       boundaries:'原始坐标为任意缩放的相对点位；不代表毫米或连续压力场；不输出疾病判断或综合健康分。'}};
 }

@@ -28,7 +28,7 @@ for(const meta of manifest){
     const analysis=analyseSegment(record,10,20),csv=segmentCSV(record,analysis),restored=parseGaitText(csv);
     assert.equal(restored.rows.length,1000);assert.deepEqual(restored.rows[0],record.rows[analysis.from]);
     assert.deepEqual(restored.rows.at(-1),record.rows[analysis.to-1]);
-    const report=buildReport(record,analysis);assert.equal(report.record.unit,'N');assert.equal(report.method.version,'ZYK-GAIT-0.1');assert.equal(report.record.sha256,meta.sha256);
+    const report=buildReport(record,analysis);assert.equal(report.record.unit,'N');assert.equal(report.method.version,'ZYK-GAIT-0.2');assert.equal(report.record.sha256,meta.sha256);
   });
   test(`${meta.id}: plot envelope retains extrema without altering input`,()=>{
     const indices=envelope(record.rows,0,record.rows.length,17,700);
