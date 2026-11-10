@@ -2,6 +2,8 @@ import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segme
 import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=workflow-6';
 import {createSession,prepareSessionRestore,normalizeSession} from './sessions.mjs?v=workflow-6';
 import {createWorkflow} from './workflow-ui.mjs?v=workflow-6';
+import {createPresentation} from './presentation.mjs?v=experience-7';
+import {createRecordComparison,recordComparisonMarkup} from './record-comparison-ui.mjs?v=experience-7';
 
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
@@ -13,6 +15,8 @@ const state={record:null,analysis:null,cursor:0,playing:false,speed:1,selected:n
 const geometry={width:900,height:280,left:56,top:22,right:884,bottom:232};
 const cached=new Map();let manifest=[],controller=null;
 const workflow=createWorkflow({getSession:snapshotSession,onRestore:restoreAnalysisSession,onReport:openReport,onPeak:()=>{$('peakLink').click();}});
+const presentation=createPresentation({getState:()=>({...state,research:explorer.researchData()}),onToggle:()=>{state.playing?pause():play();},onSeek:value=>{pause();setCursor(value);},onSpeed:value=>{state.speed=value;$('playSpeed').value=String(value);},onClose:pause});
+const recordComparison=createRecordComparison({getCurrent:()=>({record:state.record,analysis:state.analysis,research:explorer.researchData()}),download,onReport:openComparisonReport});
 const explorer=createExplorer({
   locate(time,point,full=false){
     if(!state.record)return;
@@ -33,6 +37,7 @@ function enable(ready){
   $('workspaceBoard').classList.toggle('is-loading',!ready);
   explorer.setReady(ready);
   workflow.setReady(ready);
+  presentation.setReady(ready);recordComparison.setReady(ready);
 }
 function pause(){state.playing=false;$('playButton').textContent='▶ 开始回放';$('playButton').setAttribute('aria-pressed','false');}
 function resetDisplay(){
@@ -100,6 +105,7 @@ function setRecord(record){
   pause();state.record=record;state.selected=null;state.view='full';
   explorer.setRecord(record);
   workflow.recordChanged(record);
+  recordComparison.recordChanged(record);
   const end=Math.min(20,record.duration),start=record.duration>20?10:0;
   state.cursor=start;$('segmentStart').value=start;$('segmentEnd').value=end;
   $('segmentStart').max=record.duration;$('segmentEnd').max=record.duration;
@@ -144,6 +150,7 @@ function renderFrame(){
   ['plotCursor','cursorL','cursorR'].forEach(id=>{$(id).style.visibility=inView?'visible':'hidden';});
   if(inView){const x=plotX(state.cursor,a,b);$('plotCursor').setAttribute('x1',x);$('plotCursor').setAttribute('x2',x);
     for(const [id,column] of [['cursorL',17],['cursorR',18]]){$(id).setAttribute('cx',x);$(id).setAttribute('cy',plotY(row[column]));}}
+  presentation.updateFrame();
 }
 
 function viewBounds(){return state.view==='segment'&&state.analysis?[state.analysis.start,state.analysis.end]:[0,state.record?.duration||1];}
@@ -175,6 +182,7 @@ function drawPlot(){
   text('plotCaption',`${state.view==='full'?'全程':'放大片段'} ${number(a,2)}–${number(b,2)} s · 阴影为分析片段 · 图形按区间极值抽样，统计使用完整采样。`);
   const markers=$('showEvents').checked?segmentEvents(record,{requestedStart:a,requestedEnd:b}):[];
   $('plotEventMarkers').innerHTML=markers.map(event=>`<path d="M${plotX(event.time,a,b)} ${geometry.bottom-13}V${geometry.bottom}" class="candidate-marker ${event.side==='L'?'left':'right'}"/>`).join('');
+  presentation.syncPlot();
 }
 
 function setView(view){state.view=view;$('viewFull').setAttribute('aria-pressed',String(view==='full'));$('viewSegment').setAttribute('aria-pressed',String(view==='segment'));drawPlot();renderFrame();}
@@ -215,7 +223,7 @@ function download(content,type,name){
 }
 function fileStem(){return `${state.record.id}_${state.analysis.requestedStart.toFixed(2)}-${state.analysis.requestedEnd.toFixed(2)}s`;}
 function currentReport(){return {...buildReport(state.record,state.analysis,explorer.comparison(),explorer.researchOptions()),analysisNote:workflow.note()};}
-function updateWorkflowSummary(){if(state.record&&state.analysis&&explorer.researchData())workflow.updateSummary(state.record,state.analysis,explorer.researchData());}
+function updateWorkflowSummary(){if(state.record&&state.analysis&&explorer.researchData()){workflow.updateSummary(state.record,state.analysis,explorer.researchData());presentation.updateAnalysis();}}
 function snapshotSession(details){
   if(!state.record||!state.analysis)throw new Error('请先载入有效记录。');
   const saved=explorer.sessionState();
@@ -251,7 +259,9 @@ function reportMarkup(){
   const report=currentReport(),a=report.segment;
   return `${report.analysisNote.note?`<div class="report-provenance"><strong>用户研究备注 · ${escape(report.analysisNote.title)}</strong><p>${escape(report.analysisNote.note).replace(/\n/g,"<br>")}</p></div>`:""}<div class="report-provenance"><span class="source-pill">${escape(report.mode)}</span><p>${escape(report.record.source)}<br>记录：${escape(report.record.file)} · 原始受力单位 N</p><p>回放以首样本为0秒；首样本原始时间 ${number(report.record.timeOrigin,4)} s，CSV保留原始时间列。</p></div><dl class="report-facts"><div><dt>请求片段</dt><dd>${number(a.requestedStart,2)}–${number(a.requestedEnd,2)} s</dd></div><div><dt>实际采样范围</dt><dd>${number(a.start,4)}–${number(a.end,4)} s</dd></div><div><dt>参与统计采样</dt><dd>${a.samples}条</dd></div><div><dt>方法版本</dt><dd>${escape(report.method.version)}</dd></div></dl><table><thead><tr><th>观察项</th><th>左脚</th><th>右脚</th></tr></thead><tbody><tr><td>采样均值</td><td>${number(a.leftMean)} N</td><td>${number(a.rightMean)} N</td></tr><tr><td>总受力峰值</td><td>${number(a.leftPeak)} N</td><td>${number(a.rightPeak)} N</td></tr><tr><td>受力积分占比</td><td>${a.leftShare===null?'—':number(a.leftShare*100)+'%'}</td><td>${a.rightShare===null?'—':number(a.rightShare*100)+'%'}</td></tr><tr><td>候选触地次数</td><td>${a.leftEvents}</td><td>${a.rightEvents}</td></tr></tbody></table>${reportDetailsMarkup(report)}<h3>方法与范围</h3><p>${escape(report.method.summary)}</p><p>${escape(report.method.contact)}</p><p>${escape(report.method.boundaries)}</p><div class="report-source"><strong>来源与追溯</strong><p>${report.record.sourceUrl?escape(report.record.sourceUrl):'本地文件，来源与单位由导入者确认。'}</p><p>SHA-256：${escape(report.record.sha256||'当前环境未计算')}</p><p>生成时间：${escape(new Date(report.generatedAt).toLocaleString('zh-CN'))} · 公开数据背景及许可见研究与验证页。本报告不是疾病诊断。</p></div>`;
 }
-function openReport(){if(!state.analysis)return;pause();const markup=reportMarkup();$('reportContent').innerHTML=markup;$('printReportRoot').innerHTML='<h1>足元康｜足底受力片段观察报告</h1>'+markup;$('printReportRoot').querySelectorAll('details').forEach(node=>{node.open=true;});$('reportDialog').showModal();}
+function showReport(markup,title,kind){pause();state.reportKind=kind;$('reportTitle').textContent=title;$('reportContent').innerHTML=markup;$('printReportRoot').innerHTML=`<h1>足元康｜${title}</h1>`+markup;$('printReportRoot').querySelectorAll('details').forEach(node=>{node.open=true;});$('reportDialog').showModal();}
+function openReport(){if(state.analysis)showReport(reportMarkup(),'足底受力片段观察报告','segment');}
+function openComparisonReport(){const result=recordComparison.result();if(result)showReport(recordComparisonMarkup(result),'跨记录受力观察报告','records');}
 
 const tour=[
   ['选择一份真实记录','从两份公开样本中选择。先看来源、单位和记录时长，再开始回放。','recordArea'],
@@ -286,7 +296,7 @@ $('recordSelect').addEventListener('change',event=>loadRecord(event.target.value
 $('retryLoad').addEventListener('click',()=>loadRecord($('recordSelect').value));
 $('exportCSV').addEventListener('click',()=>{download(segmentCSV(state.record,state.analysis),'text/csv;charset=utf-8',`${fileStem()}.csv`);status('片段CSV已生成，可在浏览器下载记录中查看。');});
 $('reportButton').addEventListener('click',openReport);$('closeReport').addEventListener('click',()=>$('reportDialog').close());
-$('downloadReportJSON').addEventListener('click',()=>download(JSON.stringify(currentReport(),null,2),'application/json',`${fileStem()}_report.json`));
+$('downloadReportJSON').addEventListener('click',()=>download(JSON.stringify(state.reportKind==='records'?recordComparison.result():currentReport(),null,2),'application/json',state.reportKind==='records'?'zuyuankang_record-comparison.json':`${fileStem()}_report.json`));
 $('printReportButton').addEventListener('click',()=>window.print());
 $('focusMode').addEventListener('click',()=>{const active=document.body.classList.toggle('workspace-focus');$('focusMode').setAttribute('aria-pressed',String(active));text('focusMode',active?'退出专注模式 ↙':'专注模式 ↗');if(active)$('workspaceBoard').scrollIntoView({block:'start',behavior:'instant'});});
 $('tourStart').addEventListener('click',()=>{state.tour=0;showTour();});
@@ -306,6 +316,9 @@ $('importFile').addEventListener('change',async event=>{
 });
 
 createPoints();enable(false);requestAnimationFrame(tick);
+$('startExample').addEventListener('click',async()=>{$('recordSelect').value='GaCo01_01';await loadRecord('GaCo01_01');$('recordArea').scrollIntoView({block:'start',behavior:'instant'});$('playButton').focus({preventScroll:true});});
+$('startImport').addEventListener('click',()=>$('importFile').click());
+$('startRestore').addEventListener('click',()=>{$('sessionArea').scrollIntoView({block:'start',behavior:'instant'});$('savedSessionSelect').focus({preventScroll:true});});
 if('ResizeObserver' in window){const observer=new ResizeObserver(()=>{if(state.record){drawPlot();renderFrame();}});observer.observe($('wavePlot'));observer.observe($('sensorDiagram'));}
 try{
   const response=await fetch('./data/records.json');if(!response.ok)throw new Error('样本目录暂时无法读取。');
