@@ -2,7 +2,7 @@ import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segme
 import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=workflow-6';
 import {createSession,prepareSessionRestore,normalizeSession} from './sessions.mjs?v=workflow-6';
 import {createWorkflow} from './workflow-ui.mjs?v=workflow-6';
-import {createPresentation} from './presentation.mjs?v=motion-8';
+import {createPresentation} from './presentation.mjs?v=inline-9';
 import {pressureAppearance} from './motion-data.mjs?v=motion-8';
 import {createRecordComparison,recordComparisonMarkup} from './record-comparison-ui.mjs?v=experience-7';
 
@@ -16,7 +16,7 @@ const state={record:null,analysis:null,cursor:0,playing:false,speed:1,selected:n
 const geometry={width:900,height:280,left:56,top:22,right:884,bottom:232};
 const cached=new Map();let manifest=[],controller=null;
 const workflow=createWorkflow({getSession:snapshotSession,onRestore:restoreAnalysisSession,onReport:openReport,onPeak:()=>{$('peakLink').click();}});
-const presentation=createPresentation({getState:()=>({...state,research:explorer.researchData()}),onToggle:()=>{state.playing?pause():play();},onSeek:value=>{pause();setCursor(value);},onSpeed:value=>{state.speed=value;$('playSpeed').value=String(value);},onClose:pause});
+const presentation=createPresentation({getState:()=>({...state,research:explorer.researchData()}),onToggle:()=>{state.playing?pause():play();},onSeek:value=>{pause();setCursor(value);},onSpeed:value=>{state.speed=value;$('playSpeed').value=String(value);},onPointTools:()=>{$('rawSignals').open=true;$('rawSignals').scrollIntoView({block:'start',behavior:'instant'});$('pointSelect').focus({preventScroll:true});}});
 const recordComparison=createRecordComparison({getCurrent:()=>({record:state.record,analysis:state.analysis,research:explorer.researchData()}),download,onReport:openComparisonReport});
 const explorer=createExplorer({
   locate(time,point,full=false){
@@ -24,7 +24,7 @@ const explorer=createExplorer({
     pause();if(point)state.selected=point;
     if(full)setView('full');else drawPlot();
     if(time!==undefined)setCursor(time);else renderFrame();
-    $('chartArea').scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
+    $('rawSignals').open=true;$('chartArea').scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
   },
   onRange(start,end){$('segmentStart').value=start;$('segmentEnd').value=end;applySegment();},
   onReport:openReport,
@@ -40,7 +40,7 @@ function enable(ready){
   workflow.setReady(ready);
   presentation.setReady(ready);recordComparison.setReady(ready);
 }
-function pause(){state.playing=false;$('playButton').textContent='▶ 开始回放';$('playButton').setAttribute('aria-pressed','false');}
+function pause(){state.playing=false;$('playButton').textContent='▶ 开始回放';$('playButton').setAttribute('aria-pressed','false');presentation.updateFrame();}
 function resetDisplay(){
   ['recordCode','recordDuration','recordSamples','recordRate','recordQuality','leftCurrent','rightCurrent','metricLeftMean','metricRightMean','metricLeftShare','metricEvents','recordPointMax'].forEach(id=>text(id,'—'));
   ['forcePathL','forcePathR','forcePathPoint'].forEach(id=>$(id).setAttribute('d',''));
@@ -266,7 +266,7 @@ function openComparisonReport(){const result=recordComparison.result();if(result
 
 const tour=[
   ['选择一份真实记录','从两份公开样本中选择。先看来源、单位和记录时长，再开始回放。','recordArea'],
-  ['跟随时间轴，观察双脚','播放或拖动时间轴，点位和曲线同步更新。点击一个点，还能查看它的局部信号。','sensorArea'],
+  ['跟随时间轴，观察双脚','播放或拖动时间轴，点位和曲线同步更新。点击点位查看局部数值，或切换到3D鞋垫观察原理动画。','motionWorkspace'],
   ['选一段，核对观察','默认选中10–20秒。查看片段均值与左右占比，再点击“定位到曲线”核对峰值。','analysisArea'],
   ['把依据带走','点击“生成观察报告”，查看方法与来源。可打印存为PDF，或导出片段CSV与报告JSON。','reportArea']
 ];
@@ -292,7 +292,7 @@ $('wavePlot').addEventListener('click',event=>{
   const rect=$('wavePlot').getBoundingClientRect(),x=(event.clientX-rect.left)/rect.width*geometry.width,[a,b]=viewBounds();
   setCursor(a+Math.max(0,Math.min(1,(x-geometry.left)/(geometry.right-geometry.left)))*(b-a));
 });
-$('peakLink').addEventListener('click',()=>{pause();setCursor(state.analysis.peakTime);$('chartArea').scrollIntoView({block:'center',behavior:'smooth'});});
+$('peakLink').addEventListener('click',()=>{pause();setCursor(state.analysis.peakTime);$('rawSignals').open=true;$('chartArea').scrollIntoView({block:'center',behavior:'smooth'});});
 $('recordSelect').addEventListener('change',event=>loadRecord(event.target.value));
 $('retryLoad').addEventListener('click',()=>loadRecord($('recordSelect').value));
 $('exportCSV').addEventListener('click',()=>{download(segmentCSV(state.record,state.analysis),'text/csv;charset=utf-8',`${fileStem()}.csv`);status('片段CSV已生成，可在浏览器下载记录中查看。');});
@@ -317,7 +317,7 @@ $('importFile').addEventListener('change',async event=>{
 });
 
 createPoints();enable(false);requestAnimationFrame(tick);
-$('startExample').addEventListener('click',async()=>{$('recordSelect').value='GaCo01_01';await loadRecord('GaCo01_01');$('recordArea').scrollIntoView({block:'start',behavior:'instant'});$('playButton').focus({preventScroll:true});});
+$('startExample').addEventListener('click',async()=>{$('recordSelect').value='GaCo01_01';await loadRecord('GaCo01_01');$('recordArea').scrollIntoView({block:'start',behavior:'instant'});$('stagePlay').focus({preventScroll:true});});
 $('startImport').addEventListener('click',()=>$('importFile').click());
 $('startRestore').addEventListener('click',()=>{$('sessionArea').scrollIntoView({block:'start',behavior:'instant'});$('savedSessionSelect').focus({preventScroll:true});});
 if('ResizeObserver' in window){const observer=new ResizeObserver(()=>{if(state.record){drawPlot();renderFrame();}});observer.observe($('wavePlot'));observer.observe($('sensorDiagram'));}

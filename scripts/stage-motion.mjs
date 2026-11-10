@@ -4,7 +4,7 @@ const $=id=>document.getElementById(id),NS='http://www.w3.org/2000/svg';
 const n=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('zh-CN',{maximumFractionDigits:digits}):'—';
 const reasons={outside:'选段外',gap:'采样缺口',lowForce:'低于受力门限',totalMismatch:'总量待核对',nonfinite:'无效信号',unavailable:'无可用坐标'};
 
-export function createStageMotion({getState}){
+export function createStageMotion({getState,isActive=()=>true}){
   const reduced=matchMedia('(prefers-reduced-motion: reduce)');let mode='rolling',plot=null,lastKey='',trail=null;
   function mount(){
     plot=document.createElementNS(NS,'svg');plot.setAttribute('viewBox','0 0 900 265');plot.setAttribute('role','img');plot.setAttribute('aria-label','最近六秒左右脚总受力，随回放时间推进');
@@ -41,8 +41,8 @@ export function createStageMotion({getState}){
     }
     $('stageCopStatus').textContent=labels.join(' / ');
   }
-  function update(){if(!plot||!$('presentationDialog').open)return;const state=getState();if(!state.record||!state.analysis)return;updateWave(state);updateCop(state);}
+  function update(){if(!plot||!isActive())return;const state=getState();if(!state.record||!state.analysis)return;updateWave(state);updateCop(state);}
   for(const key of ['rolling','segment'])$(`stageWave-${key}`).addEventListener('click',()=>{mode=key;lastKey='';for(const name of ['rolling','segment'])$(`stageWave-${name}`).setAttribute('aria-pressed',String(key===name));plot?.setAttribute('aria-label',key==='rolling'?'最近六秒左右脚总受力，随回放时间推进':'当前分析选段的左右脚总受力');update();});
   reduced.addEventListener('change',()=>{lastKey='';update();});
-  return {mount,update,invalidate(){lastKey='';update();}};
+  return {mount,update,reset(){lastKey='';if(plot){plot.querySelectorAll('.motion-wave').forEach(node=>node.setAttribute('d',''));plot.querySelectorAll('.motion-wave-dot,.motion-wave-cursor').forEach(node=>node.setAttribute('visibility','hidden'));}if(trail){trail.querySelectorAll('path').forEach(node=>node.setAttribute('d',''));trail.querySelectorAll('circle').forEach(node=>node.setAttribute('visibility','hidden'));}},invalidate(){lastKey='';update();}};
 }

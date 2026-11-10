@@ -1,5 +1,5 @@
 import {frameIndex} from './gait.mjs?v=research-5';
-import {createStageMotion} from './stage-motion.mjs?v=motion-8';
+import {createStageMotion} from './stage-motion.mjs?v=inline-9';
 const $=id=>document.getElementById(id);
 const n=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('zh-CN',{maximumFractionDigits:digits,minimumFractionDigits:digits}):'—';
 
@@ -17,12 +17,13 @@ function cloneVisualization(source,prefix){
   return clone;
 }
 
-export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
-  const dialog=$('presentationDialog'),fullscreenTarget=dialog.querySelector('.stage-shell');let ready=false;
-  const motion=createStageMotion({getState}),reduced=matchMedia('(prefers-reduced-motion: reduce)');
-  let model=null,modelPromise=null,view='sensors';
+export function createPresentation({getState,onToggle,onSeek,onSpeed,onPointTools}){
+  const root=$('motionWorkspace');let ready=false,mounted=false,onScreen=true;
+  const motion=createStageMotion({getState,isActive:()=>ready}),reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let model=null,modelPromise=null,view='sensors',modelFailed=false;
+  const modelActive=()=>ready&&onScreen&&!document.hidden&&view==='model';
   function modelPlayback(playing){$('stageModelPlay').textContent=playing?'Ⅱ 暂停示意':'▶ 播放示意';$('stageModelPlay').setAttribute('aria-pressed',String(playing));}
-  function modelUnavailable(message){$('stageModelStatus').textContent=message;$('stageModelPlay').disabled=true;$('stageModelReset').disabled=true;}
+  function modelUnavailable(message){modelFailed=true;$('stageModelStatus').textContent=message;$('stageModelPlay').disabled=true;$('stageModelReset').disabled=true;}
   async function setSensorView(next,focus=false){
     view=next;
     for(const key of ['sensors','model']){const button=$(`stageView-${key}`),active=key===next;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;}
@@ -36,14 +37,14 @@ export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
       $('stageModelStatus').textContent='正在加载3D原理模型…';
       modelPromise=import('./insole-model.mjs?v=motion-8').then(({createInsoleModel})=>{
         model=createInsoleModel({container:$('stageModelViewport'),onPlayback:modelPlayback,onUnavailable:modelUnavailable,reducedMotion:reduced.matches});
-        $('stageModelPlay').disabled=false;$('stageModelReset').disabled=false;
+        $('stageModelPlay').disabled=!ready;$('stageModelReset').disabled=!ready;
         $('stageModelStatus').textContent='拖动旋转 · 滚轮或双指缩放 · 聚焦后方向键旋转';return model;
       }).catch(error=>{modelUnavailable(error.message||'3D暂不可用，可继续查看真实受力回放。');return null;});
     }
-    const instance=await modelPromise;instance?.setActive(dialog.open&&view==='model');
+    const instance=await modelPromise;instance?.setActive(modelActive());
   }
   function updateFrame(){
-    if(!dialog.open)return;
+    if(!ready||!mounted)return;
     const {record,analysis,cursor,playing}=getState();if(!record||!analysis)return;
     const row=record.rows[frameIndex(record,cursor)];
     $('stageTime').textContent=`${n(cursor,2)} s`;$('stageLeft').textContent=n(row[17]);$('stageRight').textContent=n(row[18]);
@@ -55,15 +56,17 @@ export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
       node.querySelector('.sensor-cell').style.fill=original.querySelector('.sensor-cell').style.fill;
       const halo=node.querySelector('.sensor-halo'),sourceHalo=original.querySelector('.sensor-halo');halo.setAttribute('r',sourceHalo.getAttribute('r'));halo.style.fill=sourceHalo.style.fill;halo.style.fillOpacity=sourceHalo.style.fillOpacity;
       node.querySelector('title').textContent=original.querySelector('title').textContent;
+      node.classList.toggle('is-selected',original.classList.contains('is-selected'));node.setAttribute('aria-pressed',original.getAttribute('aria-pressed'));node.setAttribute('aria-label',original.getAttribute('aria-label'));
     }
+    $('inlinePointStatus').textContent=$('pointSelect').value?`${$('pointName').textContent} · ${$('pointValue').textContent}`:'点击点位，选择局部信号';
     motion.update();
   }
   function syncPlot(){
-    if(!dialog.open)return;
+    if(!ready||!mounted)return;
     motion.invalidate();updateFrame();
   }
   function updateAnalysis(){
-    if(!dialog.open)return;
+    if(!ready||!mounted)return;
     const {record,analysis,research}=getState();if(!record||!analysis)return;
     $('stageSource').textContent=`${record.local?'本地文件':'PhysioNet公开记录'} · ${record.id}`;
     $('stageRange').textContent=`分析范围 ${n(analysis.start,2)}–${n(analysis.end,2)} s · ${analysis.samples}条采样`;
@@ -75,14 +78,17 @@ export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
     $('stageSeek').max=record.duration;$('stageSpeed').value=$('playSpeed').value;$('stageLoop').checked=$('loopSegment').checked;
     motion.invalidate();
   }
-  function open(){
-    if(!ready)return;
+  function mount(){
+    if(mounted)return;
     const sensor=cloneVisualization($('sensorDiagram'),'stage-');$('stageSensors').replaceChildren(sensor);
-    dialog.showModal();document.body.classList.add('stage-open');setSensorView('sensors');motion.mount();updateAnalysis();updateFrame();
+    for(const node of sensor.querySelectorAll('[data-stage-point]')){
+      node.setAttribute('role','button');node.setAttribute('tabindex','0');
+      const select=()=>{if(ready)document.querySelector(`[data-point="${node.dataset.stagePoint}"]`).dispatchEvent(new MouseEvent('click',{bubbles:true}));};
+      node.addEventListener('click',select);node.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();select();}});
+    }
+    mounted=true;motion.mount();
   }
-  $('presentationMode').addEventListener('click',open);
-  $('closePresentation').addEventListener('click',()=>dialog.close());
-  dialog.addEventListener('close',()=>{document.body.classList.remove('stage-open');model?.setActive(false);onClose();if(document.fullscreenElement===fullscreenTarget)document.exitFullscreen().catch(()=>{});});
+  $('motionPointTools').addEventListener('click',onPointTools);
   for(const key of ['sensors','model']){
     $(`stageView-${key}`).addEventListener('click',()=>setSensorView(key));
     $(`stageView-${key}`).addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();setSensorView(event.key==='Home'?'sensors':event.key==='End'?'model':key==='sensors'?'model':'sensors',true);}});
@@ -90,7 +96,8 @@ export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
   $('stageModelPlay').addEventListener('click',()=>{if(model)model.setPlaying(!model.playing);});
   $('stageModelReset').addEventListener('click',()=>model?.reset());
   reduced.addEventListener('change',()=>{if(reduced.matches)model?.pause();});
-  document.addEventListener('visibilitychange',()=>model?.setActive(!document.hidden&&dialog.open&&view==='model'));
+  document.addEventListener('visibilitychange',()=>{model?.setActive(modelActive());if(!document.hidden)updateFrame();});
+  if('IntersectionObserver' in window)new IntersectionObserver(entries=>{onScreen=entries[0].isIntersecting;model?.setActive(modelActive());},{threshold:0}).observe(root);
   $('stagePlay').addEventListener('click',()=>{onToggle();updateFrame();});
   $('stageRestart').addEventListener('click',()=>{onSeek(getState().analysis.start);updateFrame();});
   $('stageSeek').addEventListener('input',event=>{onSeek(Number(event.target.value));updateFrame();});
@@ -99,8 +106,16 @@ export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
   $('stagePeakLink').addEventListener('click',()=>{onSeek(getState().analysis.peakTime);updateFrame();});
   $('stageFullscreen').addEventListener('click',async()=>{
     $('stageDisplayNote').classList.add('has-feedback');
-    try{if(document.fullscreenElement===fullscreenTarget)await document.exitFullscreen();else if(fullscreenTarget.requestFullscreen)await fullscreenTarget.requestFullscreen();else throw new Error();$('stageDisplayNote').textContent='按 Esc 可退出全屏或关闭展示。';}
-    catch{$('stageDisplayNote').textContent='当前环境未允许浏览器全屏，窗口内展示仍可使用。';}
+    try{if(document.fullscreenElement===root)await document.exitFullscreen();else if(root.requestFullscreen)await root.requestFullscreen();else throw new Error();$('stageDisplayNote').textContent=document.fullscreenElement===root?'按 Esc 返回工作台':'动画与曲线共用记录时间轴';}
+    catch{$('stageDisplayNote').textContent='当前环境未允许全屏，可以继续在页面中查看。';}
   });
-  return {updateFrame,updateAnalysis,syncPlot,setReady(value){ready=value;$('presentationMode').disabled=!value;}};
+  document.addEventListener('fullscreenchange',()=>{$('stageFullscreen').textContent=document.fullscreenElement===root?'退出全屏 ↙':'全屏查看 ⛶';if(!document.fullscreenElement)$('stageDisplayNote').textContent='动画与曲线共用记录时间轴';});
+  function setReady(value){
+    ready=value;root.setAttribute('aria-busy',String(!value));
+    ['stagePlay','stageRestart','stageSeek','stageSpeed','stageLoop','stagePeakLink','stageFullscreen','stageView-sensors','stageView-model','stageWave-rolling','stageWave-segment','motionPointTools'].forEach(id=>{$(id).disabled=!value;});
+    $('stageModelPlay').disabled=!value||!model||modelFailed;$('stageModelReset').disabled=!value||!model||modelFailed;
+    if(value){mount();updateAnalysis();updateFrame();}else{motion.reset();$('stageSource').textContent='正在载入记录…';$('stageRange').textContent='';$('stageTime').textContent='— s';$('stageLeft').textContent='—';$('stageRight').textContent='—';$('stagePeak').textContent='—';$('stageCycles').textContent='—';$('stageBalance').textContent='等待分析';$('stageCopStatus').textContent='等待有效采样';$('stagePlaybackState').textContent='等待记录';}
+    model?.setActive(modelActive());
+  }
+  return {updateFrame,updateAnalysis,syncPlot,setReady};
 }
