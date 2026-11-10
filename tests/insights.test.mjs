@@ -64,7 +64,7 @@ test('zero-force interpretation and comparison preserve unavailable shares',()=>
 test('report contains traceable point, event, quality and comparison details',()=>{
   const compare={recordId:record.id,...compareSegments(analysis,analyseSegment(record,20,30))};
   const report=buildReport(record,analysis,compare);
-  assert.equal(report.method.version,'ZYK-GAIT-0.2');assert.equal(report.pointStatistics.length,16);
+  assert.equal(report.method.version,'ZYK-GAIT-0.3');assert.equal(report.pointStatistics.length,16);
   assert.equal(report.candidateEvents.length,analysis.leftEvents+analysis.rightEvents);assert.equal(report.interpretation.length,3);
   assert.equal(report.qualityChecks.rows,record.rows.length);assert.equal(report.record.integrity,'verified');
   assert.equal(report.comparison.recordId,record.id);assert.equal(report.record.sha256,'source-hash');

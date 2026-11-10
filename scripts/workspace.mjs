@@ -1,5 +1,5 @@
-import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segmentCSV,buildReport,digestBytes,segmentEvents} from './gait.mjs?v=analysis-4';
-import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=analysis-4';
+import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segmentCSV,buildReport,digestBytes,segmentEvents} from './gait.mjs?v=research-5';
+import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=research-5';
 
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
@@ -19,6 +19,7 @@ const explorer=createExplorer({
     $('chartArea').scrollIntoView({block:'center',behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
   },
   onRange(start,end){$('segmentStart').value=start;$('segmentEnd').value=end;applySegment();},
+  onReport:openReport,
   onEvents(){if(state.record){$('showEvents').checked=true;drawPlot();}}
 });
 
@@ -120,6 +121,7 @@ function renderFrame(){
   text('pointName',selected?`${selected.side==='L'?'左脚':'右脚'} ${selected.id} · 当前点位受力`:'点击点位，查看局部信号');
   text('pointValue',selected?`${number(row[selected.column])} N`:'—');$('clearPoint').hidden=!selected;
   explorer.updateSelection(state.selected);
+  explorer.updateCursor(state.cursor);
   const [a,b]=viewBounds(),inView=state.cursor>=a&&state.cursor<=b;
   ['plotCursor','cursorL','cursorR'].forEach(id=>{$(id).style.visibility=inView?'visible':'hidden';});
   if(inView){const x=plotX(state.cursor,a,b);$('plotCursor').setAttribute('x1',x);$('plotCursor').setAttribute('x2',x);
@@ -194,7 +196,7 @@ function download(content,type,name){
   const url=URL.createObjectURL(new Blob([content],{type})),link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 function fileStem(){return `${state.record.id}_${state.analysis.requestedStart.toFixed(2)}-${state.analysis.requestedEnd.toFixed(2)}s`;}
-function currentReport(){return buildReport(state.record,state.analysis,explorer.comparison());}
+function currentReport(){return buildReport(state.record,state.analysis,explorer.comparison(),explorer.researchOptions());}
 function reportMarkup(){
   const report=currentReport(),a=report.segment;
   return `<div class="report-provenance"><span class="source-pill">${escape(report.mode)}</span><p>${escape(report.record.source)}<br>记录：${escape(report.record.file)} · 原始受力单位 N</p><p>回放以首样本为0秒；首样本原始时间 ${number(report.record.timeOrigin,4)} s，CSV保留原始时间列。</p></div><dl class="report-facts"><div><dt>请求片段</dt><dd>${number(a.requestedStart,2)}–${number(a.requestedEnd,2)} s</dd></div><div><dt>实际采样范围</dt><dd>${number(a.start,4)}–${number(a.end,4)} s</dd></div><div><dt>参与统计采样</dt><dd>${a.samples}条</dd></div><div><dt>方法版本</dt><dd>${escape(report.method.version)}</dd></div></dl><table><thead><tr><th>观察项</th><th>左脚</th><th>右脚</th></tr></thead><tbody><tr><td>采样均值</td><td>${number(a.leftMean)} N</td><td>${number(a.rightMean)} N</td></tr><tr><td>总受力峰值</td><td>${number(a.leftPeak)} N</td><td>${number(a.rightPeak)} N</td></tr><tr><td>受力积分占比</td><td>${a.leftShare===null?'—':number(a.leftShare*100)+'%'}</td><td>${a.rightShare===null?'—':number(a.rightShare*100)+'%'}</td></tr><tr><td>候选触地次数</td><td>${a.leftEvents}</td><td>${a.rightEvents}</td></tr></tbody></table>${reportDetailsMarkup(report)}<h3>方法与范围</h3><p>${escape(report.method.summary)}</p><p>${escape(report.method.contact)}</p><p>${escape(report.method.boundaries)}</p><div class="report-source"><strong>来源与追溯</strong><p>${report.record.sourceUrl?escape(report.record.sourceUrl):'本地文件，来源与单位由导入者确认。'}</p><p>SHA-256：${escape(report.record.sha256||'当前环境未计算')}</p><p>生成时间：${escape(new Date(report.generatedAt).toLocaleString('zh-CN'))} · 公开数据背景及许可见研究与验证页。本报告不是疾病诊断。</p></div>`;

@@ -1,6 +1,7 @@
 // Original, browser-side analysis for PhysioNet-compatible 19-column records.
 // Inputs remain in seconds and Newtons; render sampling never affects statistics.
-export const METHOD_VERSION = 'ZYK-GAIT-0.2';
+import {buildResearch,RESEARCH_VERSION} from './research.mjs?v=research-5';
+export const METHOD_VERSION = RESEARCH_VERSION;
 export const CSV_HEADERS = ['time_s', ...Array.from({length:8},(_,i)=>`L${i+1}_N`), ...Array.from({length:8},(_,i)=>`R${i+1}_N`), 'Ltotal_N', 'Rtotal_N'];
 export const POINTS = [
   ...[[-500,-800],[-700,-400],[-300,-400],[-700,0],[-300,0],[-700,400],[-300,400],[-500,800]].map(([x,y],i)=>({id:`L${i+1}`,side:'L',column:i+1,x,y})),
@@ -189,16 +190,16 @@ export function segmentCSV(record,analysis) {
   return '\uFEFF'+CSV_HEADERS.join(',')+'\r\n'+record.rows.slice(analysis.from,analysis.to).map(row=>row.join(',')).join('\r\n');
 }
 
-export function buildReport(record,analysis,comparison=null) {
+export function buildReport(record,analysis,comparison=null,researchOptions={}) {
   const points=analysePoints(record,analysis);
   return {title:'足元康｜足底受力片段观察报告',generatedAt:new Date().toISOString(),
     mode:record.local?'本地文件分析':'公开数据回放',record:{id:record.id,file:record.file,source:record.source,
       sourceUrl:record.sourceUrl||null,sha256:record.sha256||null,integrity:record.integrity||'not-recorded',unit:'N',timeUnit:'s',timeOrigin:record.origin,
       timeline:'回放与选段相对首样本计时；CSV保留原始时间列。',samples:record.rows.length,duration:record.duration},
     segment:analysis,quality:record.quality,pointStatistics:points,interpretation:interpretSegment(analysis,points),
-    candidateEvents:segmentEvents(record,analysis),qualityChecks:qualityDiagnostics(record),comparison,
+    candidateEvents:segmentEvents(record,analysis),qualityChecks:qualityDiagnostics(record),comparison,research:buildResearch(record,analysis,POINTS,researchOptions),
     method:{version:METHOD_VERSION,
-      summary:'采样均值；原时间轴上的梯形积分；双脚总受力峰值；各点均值排序及首次峰值时间。片段对比采用同一记录内B减A，比例差以百分点表示。',
+      summary:'采样均值；原时间轴上的梯形积分；双脚总受力峰值；各点均值排序及首次峰值时间。片段对比采用同一记录内B减A，比例差以百分点表示。估计周期、101点相位插值、相对CoP代理及已应用筛选条件详见研究档案。',
       contact:'候选触地：5点移动均值；各脚全记录峰值的10%进入、5%退出；同脚事件间隔至少0.25秒；未验证识别准确率。',
       boundaries:'原始坐标为任意缩放的相对点位；不代表毫米或连续压力场；不输出疾病判断或综合健康分。'}};
 }

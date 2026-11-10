@@ -12,4 +12,4 @@ The TXT samples and format.txt are unmodified byte-for-byte copies. SHA-256 valu
 
 本网站选择两份去标识化公开记录用于教学回放，不代表自行招募或完成166人的研究。原始分组属于数据集背景，不构成网站对使用者的疾病判断。受力单位为牛顿，点位坐标是任意缩放的相对坐标，不代表毫米级位置。
 
-Our original browser-side analysis is version ZYK-GAIT-0.2. It adds per-point statistics, same-record segment comparison and traceable quality checks. Means, forces and integrals are observations; contact events are heuristic candidates, not validated gait labels. Full source references and current citation requirements are available on the dataset page.
+Our original browser-side analysis is version ZYK-GAIT-0.3. It includes per-point statistics, same-record segment comparison, traceable quality checks, event-derived engineering cycles with 101-point phase overlays, and relative-coordinate CoP proxies. Applied settings and full derived arrays are included in JSON reports; local-file geometry requires confirmation. Means, forces and integrals are observations; contact events are heuristic candidates, not validated gait labels. Full source references and current citation requirements are available on the dataset page.

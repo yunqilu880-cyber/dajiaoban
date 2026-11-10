@@ -1,4 +1,5 @@
-import {analysePoints,segmentEvents,qualityDiagnostics,interpretSegment,compareSegments} from './gait.mjs?v=analysis-4';
+import {POINTS,analysePoints,segmentEvents,qualityDiagnostics,interpretSegment,compareSegments} from './gait.mjs?v=research-5';
+import {createResearchLab,researchReportMarkup} from './research-ui.mjs?v=research-5';
 
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -8,7 +9,8 @@ const sideName=side=>side==='L'?'左脚':'右脚';
 const rangeText=a=>`${num(a.start,4)}–${num(a.end,4)} s · ${num(a.samples,0)}条`;
 const comparisonRows=comparison=>comparison.metrics.map(metric=>`<tr><th scope="row">${esc(metric.label)}</th><td>${num(metric.a)} ${metric.unit}</td><td>${num(metric.b)} ${metric.unit}</td><td>${signed(metric.delta)} ${metric.deltaUnit}</td><td>${metric.unit==='%'?'不适用':metric.a===0?'基准为0':metric.relativeChange===null?'—':signed(metric.relativeChange)+'%'}</td></tr>`).join('');
 
-export function createExplorer({locate,onRange,onEvents}) {
+export function createExplorer({locate,onRange,onEvents,onReport}) {
+  const research=createResearchLab({points:POINTS,locate,onRange,onReport});
   let record=null,analysis=null,points=[],events=[],diagnostics=null,interpretation=[],page=0,ready=false;
   let slots={a:null,b:null},lastSelection=null;
   const perPage=12,diagnosticsCache=new WeakMap();
@@ -110,11 +112,13 @@ export function createExplorer({locate,onRange,onEvents}) {
     });
   }
   function setReady(value) {
+    research.setReady(value);
     ready=value;$('explorer').setAttribute('aria-busy',String(!value));
     ['pointSide','pointOrder','captureA','captureB'].forEach(id=>{$(id).disabled=!value;});
     renderComparison();if(record&&analysis)renderEvents();
   }
   function reset() {
+    research.reset();
     record=null;analysis=null;points=[];events=[];slots={a:null,b:null};lastSelection=null;
     $('segmentNarrative').innerHTML='<p class="explorer-empty">加载记录后，按当前选段生成观察。</p>';
     $('insightScope').textContent='等待有效记录与片段。';$('pointStatsBody').innerHTML='';$('pointTableSummary').textContent='等待记录…';
@@ -123,11 +127,12 @@ export function createExplorer({locate,onRange,onEvents}) {
     $('compareMessage').textContent='对比仅在当前页面保留，切换记录后自动清空。';
     $('eventsPrev').disabled=true;$('eventsNext').disabled=true;renderComparison();
   }
-  function setRecord(value) {record=value;analysis=null;points=[];events=[];diagnostics=null;page=0;slots={a:null,b:null};$('compareMessage').textContent='已载入记录，对比已清空。保存当前有效选段作为 A，再选择另一个片段作为 B。';}
+  function setRecord(value) {research.setRecord(value);record=value;analysis=null;points=[];events=[];diagnostics=null;page=0;slots={a:null,b:null};$('compareMessage').textContent='已载入记录，对比已清空。保存当前有效选段作为 A，再选择另一个片段作为 B。';}
   function update(value,segment) {
     record=value;analysis=segment;points=analysePoints(record,analysis);events=segmentEvents(record,analysis);interpretation=interpretSegment(analysis,points);page=0;
     if(!diagnosticsCache.has(record))diagnosticsCache.set(record,qualityDiagnostics(record));diagnostics=diagnosticsCache.get(record);
     renderNarrative();renderPoints();renderEvents();renderComparison();renderQuality();
+    research.update(record,analysis);
   }
   $('pointSide').addEventListener('change',()=>{renderPoints();});$('pointOrder').addEventListener('change',()=>{renderPoints();});
   $('pointStatsBody').addEventListener('click',event=>{
@@ -148,7 +153,7 @@ export function createExplorer({locate,onRange,onEvents}) {
   $('qualityEvidence').addEventListener('click',event=>{const button=event.target.closest('[data-quality-time]');if(button&&ready)locate(Number(button.dataset.qualityTime),undefined,true);});
   window.addEventListener('resize',()=>{if(ready&&analysis&&!$('panel-events').hidden)renderEvents();});
   reset();setReady(false);
-  return {update,setRecord,setReady,reset,updateSelection,comparison:getComparison};
+  return {update,setRecord,setReady,reset,updateSelection,comparison:getComparison,updateCursor:research.updateCursor,researchOptions:research.options};
 }
 
 export function reportDetailsMarkup(report) {
@@ -159,5 +164,5 @@ export function reportDetailsMarkup(report) {
   const eventRows=events.map(event=>`<tr><td>${sideName(event.side)}</td><td>${num(event.time,4)}</td><td>${num(event.force)}</td></tr>`).join('');
   const comparison=c?`<p>同记录 ${esc(c.recordId)}；A ${rangeText(c.a)}；B ${rangeText(c.b)}。差值为B − A。${c.sameWindow?'A、B为相同采样。':c.overlapSeconds>0?`范围重叠约${num(c.overlapSeconds,2)}秒。`:''}${c.differentDuration?'片段时长不同，峰值比较受观察时长影响。':''}</p><table><thead><tr><th>观察项</th><th>A</th><th>B</th><th>B − A</th><th>相对变化</th></tr></thead><tbody>${comparisonRows(c)}</tbody></table>`:'<p>本次未保存完整的A、B对比片段。</p>';
   const evidence=[...d.gapExamples.map(item=>`采样间隔：${num(item.time,4)} s，间隔${num(item.dt*1000,3)} ms。`),...d.mismatchExamples.map(item=>`总量差异：${num(item.time,4)} s，8点和减总列：左${signed(item.leftDifference,2)} N / 右${signed(item.rightDifference,2)} N。`)];
-  return `<h3>当前片段解读 · 规则生成</h3>${interpretation}<h3>16点统计 · 按均值排序</h3><table class="report-wide-table"><thead><tr><th>排名</th><th>点位</th><th>均值 N</th><th>峰值 N</th><th>首次峰值 s</th></tr></thead><tbody>${pointRows}</tbody></table><h3>候选触地事件 · 当前片段</h3><p>共${events.length}个候选。时间相对首样本，受力为该帧原始总受力，规则未经过参考标注验证。</p>${events.length?`<details class="report-events-detail"><summary>查看全部${events.length}个事件（打印时完整展开）</summary><table><thead><tr><th>脚侧</th><th>时间 s</th><th>原始总受力 N</th></tr></thead><tbody>${eventRows}</tbody></table></details>`:''}<h3>同记录片段对比</h3>${comparison}<h3>整份记录数据检查</h3><p>${d.rows}行、19列，有限数值、非负受力、时间严格递增。中位间隔${num(d.medianDt*1000,4)} ms，最小${num(d.minDt*1000,4)} / 最大${num(d.maxDt*1000,4)} ms；${d.timeVariations}处间隔偏离中位值，${d.gaps}处大于中位间隔1.5倍；${d.totalMismatch}行8点和与总受力列差异超过0.15 N。</p>${evidence.length?`<p>以下最多显示每类前20条证据，时间相对首样本：</p><ul class="report-quality-evidence">${evidence.map(value=>`<li>${value}</li>`).join('')}</ul>`:'<p>未发现超过上述检查阈值的大间隔或总量差异；格式检查不能替代传感器标定。</p>'}`;
+  return researchReportMarkup(report.research)+`<h3>当前片段解读 · 规则生成</h3>${interpretation}<h3>16点统计 · 按均值排序</h3><table class="report-wide-table"><thead><tr><th>排名</th><th>点位</th><th>均值 N</th><th>峰值 N</th><th>首次峰值 s</th></tr></thead><tbody>${pointRows}</tbody></table><h3>候选触地事件 · 当前片段</h3><p>共${events.length}个候选。时间相对首样本，受力为该帧原始总受力，规则未经过参考标注验证。</p>${events.length?`<details class="report-events-detail"><summary>查看全部${events.length}个事件（打印时完整展开）</summary><table><thead><tr><th>脚侧</th><th>时间 s</th><th>原始总受力 N</th></tr></thead><tbody>${eventRows}</tbody></table></details>`:''}<h3>同记录片段对比</h3>${comparison}<h3>整份记录数据检查</h3><p>${d.rows}行、19列，有限数值、非负受力、时间严格递增。中位间隔${num(d.medianDt*1000,4)} ms，最小${num(d.minDt*1000,4)} / 最大${num(d.maxDt*1000,4)} ms；${d.timeVariations}处间隔偏离中位值，${d.gaps}处大于中位间隔1.5倍；${d.totalMismatch}行8点和与总受力列差异超过0.15 N。</p>${evidence.length?`<p>以下最多显示每类前20条证据，时间相对首样本：</p><ul class="report-quality-evidence">${evidence.map(value=>`<li>${value}</li>`).join('')}</ul>`:'<p>未发现超过上述检查阈值的大间隔或总量差异；格式检查不能替代传感器标定。</p>'}`;
 }
