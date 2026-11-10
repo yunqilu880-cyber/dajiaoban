@@ -2,7 +2,8 @@ import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segme
 import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=workflow-6';
 import {createSession,prepareSessionRestore,normalizeSession} from './sessions.mjs?v=workflow-6';
 import {createWorkflow} from './workflow-ui.mjs?v=workflow-6';
-import {createPresentation} from './presentation.mjs?v=experience-7';
+import {createPresentation} from './presentation.mjs?v=motion-8';
+import {pressureAppearance} from './motion-data.mjs?v=motion-8';
 import {createRecordComparison,recordComparisonMarkup} from './record-comparison-ui.mjs?v=experience-7';
 
 const $=id=>document.getElementById(id);
@@ -133,9 +134,9 @@ function renderFrame(){
   text('timeCurrent',clock(state.cursor));$('seekRange').value=state.cursor;
   for(const point of POINTS){
     const group=document.querySelector(`[data-point="${point.id}"]`),value=row[point.column];
-    const ratio=record.maxPoint>0?Math.min(1,value/record.maxPoint):0;
-    const circle=group.querySelector('.sensor-cell');circle.setAttribute('r',16+ratio*8);
-    circle.style.fill=`hsl(${125-ratio*105} ${23+ratio*24}% ${80-ratio*31}%)`;
+    const appearance=pressureAppearance(value,record.maxPoint);
+    const circle=group.querySelector('.sensor-cell');circle.setAttribute('r',appearance.radius);circle.style.fill=appearance.color;
+    const halo=group.querySelector('.sensor-halo');halo.setAttribute('r',appearance.haloRadius);halo.style.fill=appearance.color;halo.style.fillOpacity=appearance.haloOpacity;
     group.classList.toggle('is-selected',state.selected===point.id);
     group.setAttribute('aria-label',`${point.side==='L'?'左脚':'右脚'} ${point.id} · ${number(value)} N`);
     group.setAttribute('aria-pressed',String(state.selected===point.id));group.querySelector('title').textContent=`${point.id} · ${number(value)} N`;

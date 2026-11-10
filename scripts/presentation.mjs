@@ -1,4 +1,5 @@
 import {frameIndex} from './gait.mjs?v=research-5';
+import {createStageMotion} from './stage-motion.mjs?v=motion-8';
 const $=id=>document.getElementById(id);
 const n=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('zh-CN',{maximumFractionDigits:digits,minimumFractionDigits:digits}):'—';
 
@@ -18,6 +19,29 @@ function cloneVisualization(source,prefix){
 
 export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
   const dialog=$('presentationDialog'),fullscreenTarget=dialog.querySelector('.stage-shell');let ready=false;
+  const motion=createStageMotion({getState}),reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  let model=null,modelPromise=null,view='sensors';
+  function modelPlayback(playing){$('stageModelPlay').textContent=playing?'Ⅱ 暂停示意':'▶ 播放示意';$('stageModelPlay').setAttribute('aria-pressed',String(playing));}
+  function modelUnavailable(message){$('stageModelStatus').textContent=message;$('stageModelPlay').disabled=true;$('stageModelReset').disabled=true;}
+  async function setSensorView(next,focus=false){
+    view=next;
+    for(const key of ['sensors','model']){const button=$(`stageView-${key}`),active=key===next;button.setAttribute('aria-selected',String(active));button.tabIndex=active?0:-1;}
+    $('stageSensorView').hidden=next!=='sensors';$('stageModelView').hidden=next!=='model';
+    $('stagePressureTitle').textContent=next==='model'?'鞋垫结构与动作示意':'双足受力';
+    $('stagePressureUnit').textContent=next==='model'?'非IMU姿态':'16个离散点 / N';
+    if(focus)$(`stageView-${next}`).focus();
+    model?.setActive(false);
+    if(next!=='model')return;
+    if(!modelPromise){
+      $('stageModelStatus').textContent='正在加载3D原理模型…';
+      modelPromise=import('./insole-model.mjs?v=motion-8').then(({createInsoleModel})=>{
+        model=createInsoleModel({container:$('stageModelViewport'),onPlayback:modelPlayback,onUnavailable:modelUnavailable,reducedMotion:reduced.matches});
+        $('stageModelPlay').disabled=false;$('stageModelReset').disabled=false;
+        $('stageModelStatus').textContent='拖动旋转 · 滚轮或双指缩放 · 聚焦后方向键旋转';return model;
+      }).catch(error=>{modelUnavailable(error.message||'3D暂不可用，可继续查看真实受力回放。');return null;});
+    }
+    const instance=await modelPromise;instance?.setActive(dialog.open&&view==='model');
+  }
   function updateFrame(){
     if(!dialog.open)return;
     const {record,analysis,cursor,playing}=getState();if(!record||!analysis)return;
@@ -29,19 +53,14 @@ export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
       const original=document.querySelector(`[data-point="${node.dataset.stagePoint}"]`);
       node.querySelector('.sensor-cell').setAttribute('r',original.querySelector('.sensor-cell').getAttribute('r'));
       node.querySelector('.sensor-cell').style.fill=original.querySelector('.sensor-cell').style.fill;
+      const halo=node.querySelector('.sensor-halo'),sourceHalo=original.querySelector('.sensor-halo');halo.setAttribute('r',sourceHalo.getAttribute('r'));halo.style.fill=sourceHalo.style.fill;halo.style.fillOpacity=sourceHalo.style.fillOpacity;
       node.querySelector('title').textContent=original.querySelector('title').textContent;
     }
-    for(const id of ['plotCursor','cursorL','cursorR']){
-      const source=$(id),target=$(`stage-${id}`);if(!target)continue;
-      for(const attr of ['x1','x2','y1','y2','cx','cy'])if(source.hasAttribute(attr))target.setAttribute(attr,source.getAttribute(attr));
-      target.style.visibility=source.style.visibility;
-    }
+    motion.update();
   }
   function syncPlot(){
     if(!dialog.open)return;
-    const plot=cloneVisualization($('wavePlot'),'stage-');plot.removeAttribute('style');
-    plot.querySelector('#stage-forcePathPoint')?.remove();
-    $('stagePlot').replaceChildren(plot);updateFrame();
+    motion.invalidate();updateFrame();
   }
   function updateAnalysis(){
     if(!dialog.open)return;
@@ -54,15 +73,24 @@ export function createPresentation({getState,onToggle,onSeek,onSpeed,onClose}){
     $('stageObservation').textContent=`片段合计峰值位于 ${n(analysis.peakTime,2)} 秒。左右占比由原时间轴受力积分计算。`;
     $('stageBoundary').textContent=`${record.local?'导入文件由浏览器读取':'来源为公开数据集'}；当前未连接自制鞋垫或IMU。点位为离散受力，周期为待验证估计。`;
     $('stageSeek').max=record.duration;$('stageSpeed').value=$('playSpeed').value;$('stageLoop').checked=$('loopSegment').checked;
+    motion.invalidate();
   }
   function open(){
     if(!ready)return;
     const sensor=cloneVisualization($('sensorDiagram'),'stage-');$('stageSensors').replaceChildren(sensor);
-    dialog.showModal();document.body.classList.add('stage-open');updateAnalysis();syncPlot();updateFrame();
+    dialog.showModal();document.body.classList.add('stage-open');setSensorView('sensors');motion.mount();updateAnalysis();updateFrame();
   }
   $('presentationMode').addEventListener('click',open);
   $('closePresentation').addEventListener('click',()=>dialog.close());
-  dialog.addEventListener('close',()=>{document.body.classList.remove('stage-open');onClose();if(document.fullscreenElement===fullscreenTarget)document.exitFullscreen().catch(()=>{});});
+  dialog.addEventListener('close',()=>{document.body.classList.remove('stage-open');model?.setActive(false);onClose();if(document.fullscreenElement===fullscreenTarget)document.exitFullscreen().catch(()=>{});});
+  for(const key of ['sensors','model']){
+    $(`stageView-${key}`).addEventListener('click',()=>setSensorView(key));
+    $(`stageView-${key}`).addEventListener('keydown',event=>{if(['ArrowLeft','ArrowRight','Home','End'].includes(event.key)){event.preventDefault();setSensorView(event.key==='Home'?'sensors':event.key==='End'?'model':key==='sensors'?'model':'sensors',true);}});
+  }
+  $('stageModelPlay').addEventListener('click',()=>{if(model)model.setPlaying(!model.playing);});
+  $('stageModelReset').addEventListener('click',()=>model?.reset());
+  reduced.addEventListener('change',()=>{if(reduced.matches)model?.pause();});
+  document.addEventListener('visibilitychange',()=>model?.setActive(!document.hidden&&dialog.open&&view==='model'));
   $('stagePlay').addEventListener('click',()=>{onToggle();updateFrame();});
   $('stageRestart').addEventListener('click',()=>{onSeek(getState().analysis.start);updateFrame();});
   $('stageSeek').addEventListener('input',event=>{onSeek(Number(event.target.value));updateFrame();});
