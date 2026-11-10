@@ -1,5 +1,7 @@
 import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segmentCSV,buildReport,digestBytes,segmentEvents} from './gait.mjs?v=research-5';
-import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=research-5';
+import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=workflow-6';
+import {createSession,prepareSessionRestore,normalizeSession} from './sessions.mjs?v=workflow-6';
+import {createWorkflow} from './workflow-ui.mjs?v=workflow-6';
 
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
@@ -10,6 +12,7 @@ const svgNS='http://www.w3.org/2000/svg';
 const state={record:null,analysis:null,cursor:0,playing:false,speed:1,selected:null,view:'full',lastFrame:0,lastPaint:0,tour:-1,token:0};
 const geometry={width:900,height:280,left:56,top:22,right:884,bottom:232};
 const cached=new Map();let manifest=[],controller=null;
+const workflow=createWorkflow({getSession:snapshotSession,onRestore:restoreAnalysisSession,onReport:openReport,onPeak:()=>{$('peakLink').click();}});
 const explorer=createExplorer({
   locate(time,point,full=false){
     if(!state.record)return;
@@ -20,6 +23,7 @@ const explorer=createExplorer({
   },
   onRange(start,end){$('segmentStart').value=start;$('segmentEnd').value=end;applySegment();},
   onReport:openReport,
+  onResearchUpdate:updateWorkflowSummary,
   onEvents(){if(state.record){$('showEvents').checked=true;drawPlot();}}
 });
 
@@ -28,6 +32,7 @@ function enable(ready){
   ['playButton','restartButton','seekRange','applySegment','resetSegment','exportCSV','reportButton','peakLink','viewFull','viewSegment','segmentStart','segmentEnd'].forEach(id=>{$(id).disabled=!ready;});
   $('workspaceBoard').classList.toggle('is-loading',!ready);
   explorer.setReady(ready);
+  workflow.setReady(ready);
 }
 function pause(){state.playing=false;$('playButton').textContent='▶ 开始回放';$('playButton').setAttribute('aria-pressed','false');}
 function resetDisplay(){
@@ -36,6 +41,7 @@ function resetDisplay(){
   text('analysisRange','等待片段分析');text('evidenceText','记录尚未加载完成。');text('pointValue','—');
   $('reportDialog').close();
   explorer.reset();$('plotEventMarkers').innerHTML='';
+  workflow.resetSummary();
 }
 
 function createPoints(){
@@ -55,6 +61,25 @@ function createPoints(){
   }
 }
 
+async function fetchPublicRecord(meta,signal){
+  if(cached.has(meta.id))return cached.get(meta.id);
+  const response=await fetch(meta.url,{signal});
+  if(!response.ok)throw new Error(`记录读取失败（HTTP ${response.status}）。`);
+  const bytes=await response.arrayBuffer(),sha256=await digestBytes(bytes);
+  if(sha256&&sha256!==meta.sha256)throw new Error('文件校验与公开样本清单不一致，请重新加载。');
+  const record=parseGaitText(new TextDecoder('utf-8',{fatal:true}).decode(bytes),{...meta,sha256:sha256||meta.sha256,local:false,integrity:sha256?'verified':'unavailable'});
+  cached.set(meta.id,record);return record;
+}
+async function readLocalRecord(file,expectedHash=null){
+  if(file.size>10*1024*1024)throw new Error('文件超过10 MB，请先截取一段记录。');
+  const bytes=await file.arrayBuffer(),sha256=await digestBytes(bytes);
+  if(expectedHash&&sha256!==expectedHash)throw new Error('文件摘要不匹配，当前分析未被替换。请重新选择同内容原始文件。');
+  return parseGaitText(new TextDecoder('utf-8',{fatal:true}).decode(bytes),{id:file.name.replace(/\.[^.]+$/,'').replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,60)||'local-record',file:file.name,source:'本地导入 · PhysioNet兼容19列格式',local:true,sha256,integrity:sha256?'computed':'unavailable'});
+}
+function selectLocalRecord(record){
+  cached.set('local',record);let option=$('recordSelect').querySelector('option[value="local"]');
+  if(!option){option=new Option('','local');$('recordSelect').add(option);}option.textContent=`本地 · ${record.file}`;$('recordSelect').value='local';
+}
 async function loadRecord(id){
   const meta=manifest.find(record=>record.id===id);
   if(id==='local'&&cached.has('local')){++state.token;controller?.abort();setRecord(cached.get('local'));return;}
@@ -62,15 +87,7 @@ async function loadRecord(id){
   const token=++state.token;controller?.abort();controller=new AbortController();pause();enable(false);resetDisplay();state.record=null;state.analysis=null;
   status('正在读取并校验公开记录…');$('retryLoad').hidden=true;
   try{
-    let record=cached.get(id);
-    if(!record){
-      const response=await fetch(meta.url,{signal:controller.signal});
-      if(!response.ok)throw new Error(`记录读取失败（HTTP ${response.status}）。`);
-      const bytes=await response.arrayBuffer(),sha256=await digestBytes(bytes);
-      if(sha256&&sha256!==meta.sha256)throw new Error('文件校验与公开样本清单不一致，请重新加载。');
-      record=parseGaitText(new TextDecoder('utf-8',{fatal:true}).decode(bytes),{...meta,sha256:sha256||meta.sha256,local:false,integrity:sha256?'verified':'unavailable'});
-      cached.set(id,record);
-    }
+    const record=await fetchPublicRecord(meta,controller.signal);
     if(token!==state.token)return;
     setRecord(record);
   }catch(error){
@@ -82,6 +99,7 @@ async function loadRecord(id){
 function setRecord(record){
   pause();state.record=record;state.selected=null;state.view='full';
   explorer.setRecord(record);
+  workflow.recordChanged(record);
   const end=Math.min(20,record.duration),start=record.duration>20?10:0;
   state.cursor=start;$('segmentStart').value=start;$('segmentEnd').value=end;
   $('segmentStart').max=record.duration;$('segmentEnd').max=record.duration;
@@ -196,10 +214,42 @@ function download(content,type,name){
   const url=URL.createObjectURL(new Blob([content],{type})),link=document.createElement('a');link.href=url;link.download=name;document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),1500);
 }
 function fileStem(){return `${state.record.id}_${state.analysis.requestedStart.toFixed(2)}-${state.analysis.requestedEnd.toFixed(2)}s`;}
-function currentReport(){return buildReport(state.record,state.analysis,explorer.comparison(),explorer.researchOptions());}
+function currentReport(){return {...buildReport(state.record,state.analysis,explorer.comparison(),explorer.researchOptions()),analysisNote:workflow.note()};}
+function updateWorkflowSummary(){if(state.record&&state.analysis&&explorer.researchData())workflow.updateSummary(state.record,state.analysis,explorer.researchData());}
+function snapshotSession(details){
+  if(!state.record||!state.analysis)throw new Error('请先载入有效记录。');
+  const saved=explorer.sessionState();
+  return createSession(state.record,state.analysis,{...details,...saved,researchOptions:explorer.researchOptions(),
+    playback:{cursor:state.cursor,speed:state.speed,point:state.selected,view:state.view,loop:$('loopSegment').checked,showEvents:$('showEvents').checked}});
+}
+async function restoreAnalysisSession(input,file){
+  const session=normalizeSession(input),token=state.token;let record;
+  if(session.source.kind==='local'){
+    const local=cached.get('local');
+    if(file)record=await readLocalRecord(file,session.source.sha256);
+    else if(local?.sha256===session.source.sha256)record=local;
+    else return {needsFile:true};
+  }else{
+    const meta=manifest.find(item=>item.id===session.source.id&&item.sha256===session.source.sha256);
+    if(!meta)throw new Error('会话公开来源不在当前已知样本目录，未读取外部地址。');
+    record=await fetchPublicRecord(meta);
+  }
+  const prepared=prepareSessionRestore(session,record);
+  if(token!==state.token)throw new Error('恢复期间记录已变更，已取消此次恢复。');
+  ++state.token;controller?.abort();pause();
+  if(record.local)selectLocalRecord(record);else $('recordSelect').value=record.id;
+  setRecord(record);explorer.applyResearchOptions(session.researchOptions);
+  $('segmentStart').value=session.segment.start;$('segmentEnd').value=session.segment.end;applySegment(false);
+  explorer.restoreSessionView(session.ui,prepared.comparison);
+  state.selected=session.playback.point;state.speed=session.playback.speed;$('playSpeed').value=String(state.speed);
+  $('loopSegment').checked=session.playback.loop;$('showEvents').checked=session.playback.showEvents;
+  setView(session.playback.view);setCursor(session.playback.cursor);pause();
+  status('已恢复核验后的分析会话，参数与对比结果已重新计算。');
+  return {needsFile:false};
+}
 function reportMarkup(){
   const report=currentReport(),a=report.segment;
-  return `<div class="report-provenance"><span class="source-pill">${escape(report.mode)}</span><p>${escape(report.record.source)}<br>记录：${escape(report.record.file)} · 原始受力单位 N</p><p>回放以首样本为0秒；首样本原始时间 ${number(report.record.timeOrigin,4)} s，CSV保留原始时间列。</p></div><dl class="report-facts"><div><dt>请求片段</dt><dd>${number(a.requestedStart,2)}–${number(a.requestedEnd,2)} s</dd></div><div><dt>实际采样范围</dt><dd>${number(a.start,4)}–${number(a.end,4)} s</dd></div><div><dt>参与统计采样</dt><dd>${a.samples}条</dd></div><div><dt>方法版本</dt><dd>${escape(report.method.version)}</dd></div></dl><table><thead><tr><th>观察项</th><th>左脚</th><th>右脚</th></tr></thead><tbody><tr><td>采样均值</td><td>${number(a.leftMean)} N</td><td>${number(a.rightMean)} N</td></tr><tr><td>总受力峰值</td><td>${number(a.leftPeak)} N</td><td>${number(a.rightPeak)} N</td></tr><tr><td>受力积分占比</td><td>${a.leftShare===null?'—':number(a.leftShare*100)+'%'}</td><td>${a.rightShare===null?'—':number(a.rightShare*100)+'%'}</td></tr><tr><td>候选触地次数</td><td>${a.leftEvents}</td><td>${a.rightEvents}</td></tr></tbody></table>${reportDetailsMarkup(report)}<h3>方法与范围</h3><p>${escape(report.method.summary)}</p><p>${escape(report.method.contact)}</p><p>${escape(report.method.boundaries)}</p><div class="report-source"><strong>来源与追溯</strong><p>${report.record.sourceUrl?escape(report.record.sourceUrl):'本地文件，来源与单位由导入者确认。'}</p><p>SHA-256：${escape(report.record.sha256||'当前环境未计算')}</p><p>生成时间：${escape(new Date(report.generatedAt).toLocaleString('zh-CN'))} · 公开数据背景及许可见研究与验证页。本报告不是疾病诊断。</p></div>`;
+  return `${report.analysisNote.note?`<div class="report-provenance"><strong>用户研究备注 · ${escape(report.analysisNote.title)}</strong><p>${escape(report.analysisNote.note).replace(/\n/g,"<br>")}</p></div>`:""}<div class="report-provenance"><span class="source-pill">${escape(report.mode)}</span><p>${escape(report.record.source)}<br>记录：${escape(report.record.file)} · 原始受力单位 N</p><p>回放以首样本为0秒；首样本原始时间 ${number(report.record.timeOrigin,4)} s，CSV保留原始时间列。</p></div><dl class="report-facts"><div><dt>请求片段</dt><dd>${number(a.requestedStart,2)}–${number(a.requestedEnd,2)} s</dd></div><div><dt>实际采样范围</dt><dd>${number(a.start,4)}–${number(a.end,4)} s</dd></div><div><dt>参与统计采样</dt><dd>${a.samples}条</dd></div><div><dt>方法版本</dt><dd>${escape(report.method.version)}</dd></div></dl><table><thead><tr><th>观察项</th><th>左脚</th><th>右脚</th></tr></thead><tbody><tr><td>采样均值</td><td>${number(a.leftMean)} N</td><td>${number(a.rightMean)} N</td></tr><tr><td>总受力峰值</td><td>${number(a.leftPeak)} N</td><td>${number(a.rightPeak)} N</td></tr><tr><td>受力积分占比</td><td>${a.leftShare===null?'—':number(a.leftShare*100)+'%'}</td><td>${a.rightShare===null?'—':number(a.rightShare*100)+'%'}</td></tr><tr><td>候选触地次数</td><td>${a.leftEvents}</td><td>${a.rightEvents}</td></tr></tbody></table>${reportDetailsMarkup(report)}<h3>方法与范围</h3><p>${escape(report.method.summary)}</p><p>${escape(report.method.contact)}</p><p>${escape(report.method.boundaries)}</p><div class="report-source"><strong>来源与追溯</strong><p>${report.record.sourceUrl?escape(report.record.sourceUrl):'本地文件，来源与单位由导入者确认。'}</p><p>SHA-256：${escape(report.record.sha256||'当前环境未计算')}</p><p>生成时间：${escape(new Date(report.generatedAt).toLocaleString('zh-CN'))} · 公开数据背景及许可见研究与验证页。本报告不是疾病诊断。</p></div>`;
 }
 function openReport(){if(!state.analysis)return;pause();const markup=reportMarkup();$('reportContent').innerHTML=markup;$('printReportRoot').innerHTML='<h1>足元康｜足底受力片段观察报告</h1>'+markup;$('printReportRoot').querySelectorAll('details').forEach(node=>{node.open=true;});$('reportDialog').showModal();}
 
@@ -248,13 +298,9 @@ $('importFile').addEventListener('change',async event=>{
   const file=event.target.files?.[0];if(!file)return;
   pause();const token=++state.token;controller?.abort();status('正在检查本地文件格式与时间列…');
   try{
-    if(file.size>10*1024*1024)throw new Error('文件超过10 MB，请先截取一段记录。');
-    const bytes=await file.arrayBuffer();const content=new TextDecoder('utf-8',{fatal:true}).decode(bytes);
-    const record=parseGaitText(content,{id:file.name.replace(/\.[^.]+$/,'').replace(/[^\p{L}\p{N}_-]/gu,'_').slice(0,60)||'local-record',file:file.name,source:'本地导入 · PhysioNet兼容19列格式',local:true,sha256:await digestBytes(bytes)});
-    record.integrity=record.sha256?'computed':'unavailable';
+    const record=await readLocalRecord(file);
     if(token!==state.token)return;
-    cached.set('local',record);let option=$('recordSelect').querySelector('option[value="local"]');
-    if(!option){option=new Option('','local');$('recordSelect').add(option);}option.textContent=`本地 · ${file.name}`;$('recordSelect').value='local';setRecord(record);
+    selectLocalRecord(record);setRecord(record);
   }catch(error){if(token!==state.token)return;status(`导入失败：${error.message}${state.record?' 当前记录未被替换。':''}`,true);if(!state.record){enable(false);$('retryLoad').hidden=false;}}
   finally{event.target.value='';}
 });

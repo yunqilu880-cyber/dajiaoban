@@ -1,5 +1,5 @@
 import {POINTS,analysePoints,segmentEvents,qualityDiagnostics,interpretSegment,compareSegments} from './gait.mjs?v=research-5';
-import {createResearchLab,researchReportMarkup} from './research-ui.mjs?v=research-5';
+import {createResearchLab,researchReportMarkup} from './research-ui.mjs?v=workflow-6';
 
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -9,8 +9,8 @@ const sideName=side=>side==='L'?'左脚':'右脚';
 const rangeText=a=>`${num(a.start,4)}–${num(a.end,4)} s · ${num(a.samples,0)}条`;
 const comparisonRows=comparison=>comparison.metrics.map(metric=>`<tr><th scope="row">${esc(metric.label)}</th><td>${num(metric.a)} ${metric.unit}</td><td>${num(metric.b)} ${metric.unit}</td><td>${signed(metric.delta)} ${metric.deltaUnit}</td><td>${metric.unit==='%'?'不适用':metric.a===0?'基准为0':metric.relativeChange===null?'—':signed(metric.relativeChange)+'%'}</td></tr>`).join('');
 
-export function createExplorer({locate,onRange,onEvents,onReport}) {
-  const research=createResearchLab({points:POINTS,locate,onRange,onReport});
+export function createExplorer({locate,onRange,onEvents,onReport,onResearchUpdate}) {
+  const research=createResearchLab({points:POINTS,locate,onRange,onReport,onUpdate:onResearchUpdate});
   let record=null,analysis=null,points=[],events=[],diagnostics=null,interpretation=[],page=0,ready=false;
   let slots={a:null,b:null},lastSelection=null;
   const perPage=12,diagnosticsCache=new WeakMap();
@@ -153,7 +153,10 @@ export function createExplorer({locate,onRange,onEvents,onReport}) {
   $('qualityEvidence').addEventListener('click',event=>{const button=event.target.closest('[data-quality-time]');if(button&&ready)locate(Number(button.dataset.qualityTime),undefined,true);});
   window.addEventListener('resize',()=>{if(ready&&analysis&&!$('panel-events').hidden)renderEvents();});
   reset();setReady(false);
-  return {update,setRecord,setReady,reset,updateSelection,comparison:getComparison,updateCursor:research.updateCursor,researchOptions:research.options};
+  const savedRange=value=>value?{start:value.requestedStart,end:value.requestedEnd}:null;
+  return {update,setRecord,setReady,reset,updateSelection,comparison:getComparison,updateCursor:research.updateCursor,researchOptions:research.options,researchData:research.data,applyResearchOptions:research.applyOptions,
+    sessionState:()=>({comparison:{a:savedRange(slots.a),b:savedRange(slots.b)},ui:{explorerTab:tabs.find(key=>$(`tab-${key}`).getAttribute('aria-selected')==='true'),pointSide:$('pointSide').value,pointOrder:$('pointOrder').value,...research.sessionState()}}),
+    restoreSessionView(ui,comparison){slots=comparison;$('pointSide').value=ui.pointSide;$('pointOrder').value=ui.pointOrder;renderPoints();renderComparison();research.restoreView(ui);setTab(ui.explorerTab);$('compareMessage').textContent='会话对比范围已按同一原文件重新计算。';}};
 }
 
 export function reportDetailsMarkup(report) {

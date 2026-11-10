@@ -59,7 +59,7 @@ function definitionRows(data) {
   ];
 }
 
-export function createResearchLab({points,locate,onRange,onReport}) {
+export function createResearchLab({points,locate,onRange,onReport,onUpdate=()=>{}}) {
   let record=null,analysis=null,data=null,ready=false,options={...DEFAULT_RESEARCH_OPTIONS},page=0,cursor=0;
   const tabs=['cycles','cop','archive'];
   function setTab(key,focus=false){
@@ -118,7 +118,7 @@ export function createResearchLab({points,locate,onRange,onReport}) {
     const fields=[['数据来源',`${a.source} · ${a.file}`],['方法版本',data.version],['文件摘要',a.sha256||'未计算'],['时间与采样',`首样本原时间 ${n(a.timeOrigin,4)} s；${a.nominalHz?`名义${a.nominalHz} Hz`:'名义采样率未提供'}；按中位间隔估计 ${n(a.estimatedHz,3)} Hz`],['当前有效样本',`${analysis.samples}条；实际相对时间 ${n(analysis.start,4)}–${n(analysis.end,4)} s`],['已应用参数',JSON.stringify({...options,layoutConfirmed:record.local?options.layoutConfirmed:'公开布局'})],['固定筛选规则',`周期至少${RESEARCH_RULES.minCycleSamples}点；缺口>${RESEARCH_RULES.gapFactor}×中位间隔；每脚总量差>${RESEARCH_RULES.totalToleranceN} N时排除`],['坐标依据',`${data.cop.layoutSource}；${data.cop.coordinateUnit}`],['插值与离散度',`${a.normalization} ${a.dispersion}`],['验证状态',a.provenance]];
     $('labArchive').innerHTML=fields.map(([key,value])=>`<div><dt>${key}</dt><dd>${esc(value)}</dd></div>`).join('');
   }
-  function update(value,segment){record=value;analysis=segment;data=buildResearch(record,analysis,points,options);page=0;renderSummary();renderCycles();renderCop();renderArchive();updateCursor(cursor);}
+  function update(value,segment){record=value;analysis=segment;data=buildResearch(record,analysis,points,options);page=0;renderSummary();renderCycles();renderCop();renderArchive();updateCursor(cursor);onUpdate();}
   function setRecord(value){record=value;analysis=null;data=null;options={...options,layoutConfirmed:false};$('confirmCopLayout').checked=false;}
   function setReady(value){ready=value;$('researchLab').setAttribute('aria-busy',String(!value));['applyResearchOptions','labReport','cycleSide','cycleFilter','cycleMin','cycleMax','copMin','copPercent','confirmCopLayout'].forEach(id=>{$(id).disabled=!value;});if(data)renderCycles();}
   function reset(){record=null;analysis=null;data=null;['cycleSummary','cycleOverlay','cycleTableBody','cycleExclusions','labMetricDefinitions','labArchive'].forEach(id=>{$(id).innerHTML='';});$('labScope').textContent='等待有效记录与选段。';$('labOptionError').textContent='';$('cycleOverlayNote').textContent='';$('cyclePageInfo').textContent='';$('copStatus').textContent='等待记录。';['Left','Right'].forEach(side=>{$(`cop${side}Plot`).innerHTML='';$(`cop${side}Count`).textContent='—';$(`cop${side}Cursor`).textContent='等待数据';$(`cop${side}Quality`).textContent='';});['cyclePick','locateCycle','inspectCycle','cyclesPrev','cyclesNext'].forEach(id=>{$(id).disabled=true;});}
@@ -152,7 +152,10 @@ export function createResearchLab({points,locate,onRange,onReport}) {
   $('labReport').addEventListener('click',()=>{if(ready)onReport();});
   window.addEventListener('resize',()=>{if(data&&!$('lab-panel-cycles').hidden)renderOverlay();});
   reset();setReady(false);
-  return {update,setRecord,setReady,reset,updateCursor,options:()=>({...options})};
+  function applyOptions(value){options=validateResearchOptions(value);$('cycleMin').value=options.minCycleSeconds;$('cycleMax').value=options.maxCycleSeconds;$('copMin').value=options.copMinForceN;$('copPercent').value=options.copPeakPercent;$('confirmCopLayout').checked=options.layoutConfirmed;$('labOptionError').textContent='';}
+  function restoreView(ui){$('cycleSide').value=ui.cycleSide;$('cycleFilter').value=ui.cycleFilter;if(data){renderCycles();if(data.cycles[ui.cycleSide].overlay.curves.some(curve=>curve.id===ui.cyclePick))$('cyclePick').value=ui.cyclePick;}setTab(ui.researchTab);}
+  return {update,setRecord,setReady,reset,updateCursor,options:()=>({...options}),data:()=>data,applyOptions,restoreView,
+    sessionState:()=>({researchTab:tabs.find(key=>$(`lab-tab-${key}`).getAttribute('aria-selected')==='true'),cycleSide:$('cycleSide').value,cycleFilter:$('cycleFilter').value,cyclePick:$('cyclePick').value})};
 }
 
 export function researchReportMarkup(data){
