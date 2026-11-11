@@ -1,5 +1,5 @@
 import {frameIndex} from './gait.mjs?v=research-5';
-import {createStageMotion} from './stage-motion.mjs?v=inline-9';
+import {createStageMotion} from './stage-motion.mjs?v=guided-1';
 const $=id=>document.getElementById(id);
 const n=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('zh-CN',{maximumFractionDigits:digits,minimumFractionDigits:digits}):'—';
 
@@ -19,7 +19,7 @@ function cloneVisualization(source,prefix){
 
 export function createPresentation({getState,onToggle,onSeek,onSpeed,onPointTools}){
   const root=$('motionWorkspace');let ready=false,mounted=false,onScreen=true;
-  const motion=createStageMotion({getState,isActive:()=>ready}),reduced=matchMedia('(prefers-reduced-motion: reduce)');
+  const motion=createStageMotion({getState,onSeek,isActive:()=>ready}),reduced=matchMedia('(prefers-reduced-motion: reduce)');
   let model=null,modelPromise=null,view='sensors',modelFailed=false;
   const modelActive=()=>ready&&onScreen&&!document.hidden&&view==='model';
   function modelPlayback(playing){$('stageModelPlay').textContent=playing?'Ⅱ 暂停示意':'▶ 播放示意';$('stageModelPlay').setAttribute('aria-pressed',String(playing));}
@@ -87,6 +87,9 @@ export function createPresentation({getState,onToggle,onSeek,onSpeed,onPointTool
       node.addEventListener('click',select);node.addEventListener('keydown',event=>{if(['Enter',' '].includes(event.key)){event.preventDefault();select();}});
     }
     mounted=true;motion.mount();
+    const resizeLabels=()=>{const scale=sensor.getScreenCTM()?.a;if(scale>0)sensor.querySelectorAll('.sensor-node text').forEach(label=>{label.style.fontSize=`${11/scale}px`;});};
+    if('ResizeObserver' in window)new ResizeObserver(resizeLabels).observe(sensor);
+    resizeLabels();
   }
   $('motionPointTools').addEventListener('click',onPointTools);
   for(const key of ['sensors','model']){

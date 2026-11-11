@@ -1,0 +1,79 @@
+/* Task-oriented workbench. Existing research controls keep their state. */
+.page-workspace [hidden]{display:none!important}
+.workspace-mode-bar{width:min(100% - 64px,1560px);margin:0 auto 14px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.workspace-mode-tabs{display:inline-flex;gap:5px;padding:5px;border:1px solid #d8e1d9;background:#eaf0e9;border-radius:10px;flex:none}
+.workspace-mode-tabs button{min-height:44px;border:0;border-radius:7px;padding:11px 23px;background:transparent;font:500 14px var(--body);color:#526d60;cursor:pointer;transition:background .18s,box-shadow .18s}
+.workspace-mode-tabs button[aria-pressed=true]{background:#fff;color:#193e30;box-shadow:0 2px 7px #163e2912}
+.workspace-mode-bar p{font-size:13px;color:#637b6b;line-height:1.8;margin:0}
+.task-nav{margin-bottom:22px}.task-nav a{font-size:12px}.task-nav a[aria-current=location]{box-shadow:inset 0 -2px #41765a}
+.page-workspace[data-workspace-mode=quick] .record-facts{grid-template-columns:repeat(5,minmax(0,1fr))}
+.page-workspace[data-workspace-mode=quick] .start-paths{margin-bottom:22px}
+.record-provenance{display:flex;gap:9px;align-items:center;flex-wrap:wrap;padding:12px 22px;border-bottom:1px solid #e2e9e2;background:#f6f8f4;font-size:12px;color:#506f5b}
+.record-provenance>span:first-child{color:#245943;font-weight:600}.record-provenance>span+span:before{content:'·';margin-right:9px;color:#819688}
+.record-provenance a{margin-left:auto;color:#345e47;text-underline-offset:4px}
+.workflow-summary{margin-top:0;margin-bottom:28px;border-radius:14px;background:#fff}
+.workflow-summary .summary-facts{grid-template-columns:repeat(3,minmax(0,1fr));gap:26px;align-items:start}
+.workflow-summary .summary-facts strong{font-size:19px;line-height:1.6;letter-spacing:-.02em;margin-top:10px}
+.workflow-summary .summary-facts article>span{font-size:12px;letter-spacing:.04em}
+.workflow-summary .summary-facts article>p{font-size:13px;line-height:1.95;color:#586e60;margin-top:10px}
+.workflow-summary .summary-observation p{font-size:13px;line-height:1.9}.workflow-summary .summary-observation button{min-height:44px;flex:none}
+.workflow-summary .summary-review summary{font-size:13px}.workflow-summary .summary-review ul{font-size:13px;line-height:1.9}
+.research-entry{width:min(100% - 64px,1560px);margin:0 auto 28px;display:flex;gap:20px;align-items:center;justify-content:space-between;padding:25px 28px;background:#eaf0e7;border:1px solid #d9e3d4;border-radius:12px}
+.research-entry h2{font:500 18px var(--body);margin:0 0 8px;color:#264b37}.research-entry p{font-size:13px;line-height:1.85;margin:0;color:#647b5d}.research-entry button{flex:none}
+.page-workspace[data-workspace-mode=research] .research-entry{display:none}
+.inline-observation .stage-main{height:auto;min-height:590px}
+.inline-observation .stage-pressure,.inline-observation .stage-signal{min-width:0}
+.inline-observation .stage-signal{min-height:590px}
+.inline-observation #stagePlot{min-height:210px;flex:1;cursor:crosshair;touch-action:pan-y}
+#stagePlot svg:focus-visible{outline:2px solid #ddca91;outline-offset:4px;border-radius:4px}
+.inline-observation .motion-wave.point{stroke:#f0cf85;stroke-width:2.4;stroke-dasharray:5 3;fill:none;vector-effect:non-scaling-stroke}
+.stage-selected-signal{font-size:12px;color:#f0cf85;margin:0;line-height:1.7}
+.stage-wave-help{font-size:12px;line-height:1.8;color:#b2c8b7;margin:0}
+.inline-observation .stage-source-row,.inline-observation .stage-replay-tag,.inline-observation .stage-wave-caption,.inline-observation .stage-footer{font-size:12px;line-height:1.8}
+.inline-observation .stage-cop-caption small,.inline-observation .stage-cop-caption p,.inline-observation .stage-cop-caption>span{font-size:12px}
+.inline-observation .stage-observation p,.inline-point-status>span,.inline-observation .model-source-note,.inline-observation #stageModelStatus{font-size:12px}
+.inline-observation .stage-sensor-tabs button,.inline-observation .stage-wave-switch button,.inline-observation .stage-header-actions button,.inline-point-status button{min-height:40px;font-size:12px}
+.inline-observation .stage-force-values{margin-top:auto}
+.inline-observation .stage-findings{margin-top:0}.inline-observation .stage-findings span{font-size:12px}
+.inline-observation .stage-findings strong{font-size:23px}.inline-observation .stage-findings>div:first-child strong{font-size:17px}
+.inline-observation .stage-observation{gap:12px}.inline-observation .stage-observation button{font-size:12px;min-height:44px}
+.touch-segment-tools{display:flex;align-items:center;flex-wrap:wrap;gap:9px 14px;padding:17px 0 0;border-top:1px solid #3b5e49}
+.touch-segment-tools>span{font-size:12px;color:#d5e4d8}.touch-segment-tools button{border:1px solid #51765c;background:#244d3a;border-radius:7px;min-height:44px;padding:10px 14px;color:#e8f0e6;font:500 12px var(--body);cursor:pointer}
+.touch-segment-tools button:hover{background:#365f42}.touch-segment-tools button:disabled{opacity:.4;cursor:not-allowed}.touch-segment-tools #showInterpretation{margin-left:auto;background:#cfe0c2;border-color:#cfe0c2;color:#21482f}
+.touch-segment-tools p{flex-basis:100%;font-size:12px;color:#b8cdb9;line-height:1.8;margin:0}
+.mobile-panel-switch,.mobile-transport{display:none}
+.workspace-focus .workspace-mode-bar,.workspace-focus .research-entry{display:none}
+@media(max-width:1100px){.inline-observation .stage-findings{grid-template-columns:1fr 1fr}.inline-observation .stage-findings>div:first-child{grid-column:1/-1;padding:0 0 9px;border-bottom:1px solid #3b5e49}.inline-observation .stage-findings>div:nth-child(2){border-left:0;padding-left:0}.workspace-mode-bar{gap:15px}.task-nav{overflow-x:auto}.task-nav a{flex:none}}
+@media(max-width:760px){
+  .workspace-mode-bar{width:calc(100% - 24px);align-items:stretch;flex-direction:column;gap:10px;margin-bottom:16px}
+  .workspace-mode-tabs{width:100%}.workspace-mode-tabs button{flex:1;padding:11px 15px}.workspace-mode-bar p{font-size:12px;padding-inline:5px}
+  .task-nav a{font-size:12px;min-height:44px;padding:10px 14px}.task-nav{scrollbar-width:thin}
+  .workspace-intro{padding-top:24px;align-items:start}.workspace-intro h1{font-size:24px}.workspace-intro>p{display:none}
+  .start-path-heading .content-kicker{display:none}.start-path-heading h2{font-size:19px}.start-path-actions button small{font-size:12px}
+  .page-workspace[data-workspace-mode=quick] .record-facts{grid-template-columns:1fr 1fr}.record-facts>div:last-child{grid-column:1/-1}
+  .record-provenance{padding:15px 18px;font-size:12px}.record-provenance a{margin-left:0;flex-basis:100%}
+  .record-toolbar select,.record-toolbar input,.segment-controls input,.session-columns input,.session-columns textarea,.session-columns select{font-size:16px}
+  .record-toolbar .import-control>span,.workspace-status,.record-facts span,.record-facts strong{font-size:12px;line-height:1.9}
+  .record-toolbar .control-button,.toolbar-actions .control-button{min-height:44px;font-size:12px}
+  .inline-observation .stage-main{min-height:0;display:block}.inline-observation .stage-pressure,.inline-observation .stage-signal{padding:18px;min-height:0}
+  .inline-observation[data-mobile-panel=pressure] .stage-signal,.inline-observation[data-mobile-panel=signal] .stage-pressure{display:none}
+  .mobile-panel-switch{display:flex;gap:7px}.mobile-panel-switch button{min-height:44px;flex:1;border:1px solid #54715a;background:transparent;border-radius:7px;color:#bcd0bb;font:500 14px var(--body);cursor:pointer;transition:none}.mobile-panel-switch button[aria-pressed=true]{background:#d1e2c4;border-color:#d1e2c4;color:#21452e}
+  .inline-observation #stagePlot{height:250px;min-height:250px;flex:none}.inline-observation .stage-signal{gap:14px}
+  .inline-observation .stage-source-row{flex-wrap:wrap;gap:7px}.inline-observation .stage-header{flex-wrap:wrap;gap:12px}.inline-observation .stage-header-actions{width:100%;margin:0;justify-content:space-between}
+  .inline-observation .inline-motion-heading>span{font-size:11px}.inline-observation .inline-motion-heading h2{font-size:23px}
+  .inline-point-status>span{max-width:65%}.inline-point-status button{min-height:44px}
+  .inline-observation #stageSensors{height:310px}.inline-observation .stage-force-values strong{font-size:34px}.inline-observation .stage-findings>div:first-child strong{font-size:22px}
+  .inline-observation .stage-controls{flex-wrap:wrap}.inline-observation .stage-controls button,.inline-observation .stage-controls select{min-height:44px;font-size:14px}.inline-observation .stage-controls>input{order:3;flex-basis:100%;min-height:44px}
+  .inline-observation .stage-controls label{font-size:12px}.inline-observation .stage-footer{flex-direction:column;align-items:start;gap:9px}
+  .touch-segment-tools>span{flex-basis:100%;font-size:13px}.touch-segment-tools button{font-size:13px;flex:1}.touch-segment-tools #showInterpretation{margin:0;flex-basis:100%}
+  .workflow-summary .summary-facts{grid-template-columns:1fr;gap:0;padding:6px 0 17px}.workflow-summary .summary-facts article+article{border-left:0;border-top:1px solid #dce6d7;padding:19px 0 0;margin-top:19px}.workflow-summary .summary-facts article:nth-child(3){grid-column:auto}.workflow-summary .summary-facts article>p{font-size:14px}.workflow-summary .summary-facts strong{font-size:20px}.workflow-summary .summary-observation p{font-size:13px}
+  .research-entry{width:calc(100% - 24px);padding:22px 19px;align-items:start;flex-direction:column}.research-entry button{width:100%;min-height:44px;font-size:13px}
+  .workbench>.analysis-panel .analysis-metrics span,.workbench>.analysis-panel .analysis-metrics small,.workbench>.analysis-panel .method-details summary{font-size:12px}.workbench>.analysis-panel .report-actions button{font-size:12px;min-height:44px}
+  .explorer-table-wrap{overflow-x:auto}.explorer-table-wrap table{min-width:620px}.explorer-table-wrap th,.explorer-table-wrap td{font-size:12px}
+  .mobile-transport{display:grid;position:fixed;z-index:45;bottom:0;left:0;right:0;grid-template-columns:auto minmax(0,1fr) auto;gap:3px 12px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));background:#f8fbf5f7;border-top:1px solid #cddccf;box-shadow:0 -5px 24px #163e2912;backdrop-filter:blur(14px)}
+  .mobile-transport button{min-height:44px;border:1px solid #cad9cd;border-radius:7px;background:#fff;font:500 14px var(--body);padding:8px 12px;color:#28513a}.mobile-transport button:first-child{background:#20543d;color:#fff;border-color:#20543d}.mobile-transport button:disabled{opacity:.45}.mobile-transport input{grid-column:1/-1;width:100%;height:28px;accent-color:#356c4b;touch-action:pan-x}.mobile-transport strong{align-self:center;font:500 16px var(--body);color:#274f37;text-align:center;font-variant-numeric:tabular-nums}
+  .page-workspace{padding-bottom:110px}.page-workspace:has(dialog[open]) .mobile-transport{display:none}.session-section .workflow-note,.session-section .session-status,.session-section label{font-size:12px}
+  .stage-sensor-tabs button{min-height:44px}.inline-observation .stage-wave-switch button{min-height:44px}.inline-observation .model-controls button{min-height:44px}
+}
+@media(prefers-reduced-motion:reduce){.workspace-mode-tabs button,.touch-segment-tools button{transition:none}}
+@media print{.workspace-mode-bar,.research-entry,.mobile-transport{display:none!important}.page-workspace{padding-bottom:0}}

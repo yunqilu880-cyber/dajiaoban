@@ -1,8 +1,9 @@
 import {POINTS,parseGaitText,frameIndex,lowerBound,envelope,analyseSegment,segmentCSV,buildReport,digestBytes,segmentEvents} from './gait.mjs?v=research-5';
 import {createExplorer,reportDetailsMarkup} from './explorer.mjs?v=workflow-6';
 import {createSession,prepareSessionRestore,normalizeSession} from './sessions.mjs?v=workflow-6';
-import {createWorkflow} from './workflow-ui.mjs?v=workflow-6';
-import {createPresentation} from './presentation.mjs?v=inline-9';
+import {createWorkflow} from './workflow-ui.mjs?v=guided-1';
+import {createPresentation} from './presentation.mjs?v=guided-1';
+import {createWorkspaceExperience} from './workspace-experience.mjs?v=guided-1';
 import {pressureAppearance} from './motion-data.mjs?v=motion-8';
 import {createRecordComparison,recordComparisonMarkup} from './record-comparison-ui.mjs?v=experience-7';
 
@@ -15,7 +16,8 @@ const svgNS='http://www.w3.org/2000/svg';
 const state={record:null,analysis:null,cursor:0,playing:false,speed:1,selected:null,view:'full',lastFrame:0,lastPaint:0,tour:-1,token:0};
 const geometry={width:900,height:280,left:56,top:22,right:884,bottom:232};
 const cached=new Map();let manifest=[],controller=null;
-const workflow=createWorkflow({getSession:snapshotSession,onRestore:restoreAnalysisSession,onReport:openReport,onPeak:()=>{$('peakLink').click();}});
+const experience=createWorkspaceExperience();
+const workflow=createWorkflow({getSession:snapshotSession,onRestore:restoreAnalysisSession,onReport:openReport,onPeak:()=>{pause();setCursor(state.analysis.peakTime);experience.reveal('motionWorkspace');},onQuality:()=>{experience.reveal('explorer');$('tab-quality').click();}});
 const presentation=createPresentation({getState:()=>({...state,research:explorer.researchData()}),onToggle:()=>{state.playing?pause():play();},onSeek:value=>{pause();setCursor(value);},onSpeed:value=>{state.speed=value;$('playSpeed').value=String(value);},onPointTools:()=>{$('rawSignals').open=true;$('rawSignals').scrollIntoView({block:'start',behavior:'instant'});$('pointSelect').focus({preventScroll:true});}});
 const recordComparison=createRecordComparison({getCurrent:()=>({record:state.record,analysis:state.analysis,research:explorer.researchData()}),download,onReport:openComparisonReport});
 const explorer=createExplorer({
@@ -35,12 +37,13 @@ const explorer=createExplorer({
 function status(message,error=false){text('workspaceStatus',message);$('workspaceStatus').classList.toggle('is-error',error);}
 function enable(ready){
   ['playButton','restartButton','seekRange','applySegment','resetSegment','exportCSV','reportButton','peakLink','viewFull','viewSegment','segmentStart','segmentEnd'].forEach(id=>{$(id).disabled=!ready;});
+  ['markSegmentStart','markSegmentEnd','mobilePlay','mobileSeek','mobileReport','showInterpretation'].forEach(id=>{$(id).disabled=!ready;});
   $('workspaceBoard').classList.toggle('is-loading',!ready);
   explorer.setReady(ready);
   workflow.setReady(ready);
   presentation.setReady(ready);recordComparison.setReady(ready);
 }
-function pause(){state.playing=false;$('playButton').textContent='▶ 开始回放';$('playButton').setAttribute('aria-pressed','false');presentation.updateFrame();}
+function pause(){state.playing=false;$('playButton').textContent='▶ 开始回放';$('playButton').setAttribute('aria-pressed','false');$('mobilePlay').textContent='▶ 播放';$('mobilePlay').setAttribute('aria-pressed','false');presentation.updateFrame();}
 function resetDisplay(){
   ['recordCode','recordDuration','recordSamples','recordRate','recordQuality','leftCurrent','rightCurrent','metricLeftMean','metricRightMean','metricLeftShare','metricEvents','recordPointMax'].forEach(id=>text(id,'—'));
   ['forcePathL','forcePathR','forcePathPoint'].forEach(id=>$(id).setAttribute('d',''));
@@ -111,6 +114,7 @@ function setRecord(record){
   state.cursor=start;$('segmentStart').value=start;$('segmentEnd').value=end;
   $('segmentStart').max=record.duration;$('segmentEnd').max=record.duration;
   $('seekRange').max=record.duration;$('seekRange').value=start;
+  $('mobileSeek').max=record.duration;$('mobileSeek').value=start;
   text('recordCode',record.id);text('recordDuration',`${number(record.duration,2)} s`);text('recordSamples',`${number(record.rows.length,0)} 条`);
   text('recordRate',record.nominalHz?`${record.nominalHz} Hz · 名义`:`${number(record.estimatedHz,1)} Hz · 估计`);
   const checks=[];
@@ -119,6 +123,7 @@ function setRecord(record){
   text('recordQuality',checks.length?'查看检查说明':'19列 · 时间递增');
   text('recordPointMax',`${number(record.maxPoint,0)} N`);text('timeEnd',clock(record.duration));
   text('modeNote',record.local?'本地文件分析':'公开数据回放');
+  text('recordTypeTag',record.local?'本地文件 · 来源待确认':'公开实测');
   document.querySelector('.mode-title .subtle').textContent=record.local?'PhysioNet兼容格式':'PhysioNet / v1.0.0';
   text('recordOrigin',`${record.local?'本地文件':'公开数据'}：${record.file} · ${record.source}`);
   text('qualityDetail',`检查：${record.rows.length}行、19列有限数值，时间严格递增；有${record.quality.timeVariations}个间隔偏离中位采样间隔，${record.quality.gaps}处间隔超过中位值1.5倍；${record.quality.totalMismatch}行的总受力与8点合计差异超过0.15 N。首样本原时间为${number(record.origin,4)}秒，回放以该时刻为0秒，导出CSV保留原时间列。${record.local?'导入文件来源、单位与采集条件由导入者确认。':'原始点位及分组来自公开数据集，不代表我们的自制鞋垫或用户疾病判断。'}`);
@@ -132,6 +137,8 @@ function renderFrame(){
   const row=record.rows[frameIndex(record,state.cursor)];
   text('leftCurrent',`${number(row[17])} N`);text('rightCurrent',`${number(row[18])} N`);
   text('timeCurrent',clock(state.cursor));$('seekRange').value=state.cursor;
+  text('mobileTime',`${number(state.cursor,2)} s`);$('mobileSeek').value=state.cursor;
+  $('mobilePlay').textContent=state.playing?'Ⅱ 暂停':'▶ 播放';$('mobilePlay').setAttribute('aria-pressed',String(state.playing));
   for(const point of POINTS){
     const group=document.querySelector(`[data-point="${point.id}"]`),value=row[point.column];
     const appearance=pressureAppearance(value,record.maxPoint);
@@ -198,6 +205,7 @@ function applySegment(seek=true){
     text('metricEvents',`${a.leftEvents} / ${a.rightEvents}`);
     text('evidenceText',`在这段记录中，双脚总受力相加的最高值为 ${number(a.peakSum)} N，出现在 ${number(a.peakTime,2)} s。点击定位，核对该时刻的点位与波形。`);
     text('analysisHint',`实际样本范围 ${number(a.start,4)}–${number(a.end,4)} s；${a.samples}条原始采样。统计与图形显示抽样分开处理。`);
+    text('boundaryStatus',`当前分析片段 ${number(a.start,2)}–${number(a.end,2)} s`);
     explorer.update(state.record,a);
     drawPlot();if(seek){pause();setCursor(a.start);}else renderFrame();
   }catch(error){text('segmentError',`${error.message} 当前结果保持上次有效片段。`);}
@@ -217,6 +225,7 @@ function play(){
   if($('loopSegment').checked&&(state.cursor<state.analysis.start||state.cursor>=state.analysis.end))state.cursor=state.analysis.start;
   else if(state.cursor>=state.record.duration)state.cursor=0;
   state.playing=true;state.lastFrame=performance.now();$('playButton').textContent='Ⅱ 暂停回放';$('playButton').setAttribute('aria-pressed','true');
+  $('mobilePlay').textContent='Ⅱ 暂停';$('mobilePlay').setAttribute('aria-pressed','true');presentation.updateFrame();
 }
 
 function download(content,type,name){
@@ -278,6 +287,22 @@ function showTour(){
 }
 
 $('playButton').addEventListener('click',()=>state.playing?pause():play());
+$('mobilePlay').addEventListener('click',()=>state.playing?pause():play());
+$('mobileSeek').addEventListener('input',event=>{pause();setCursor(Number(event.target.value));});
+$('mobileReport').addEventListener('click',openReport);
+$('showInterpretation').addEventListener('click',()=>experience.reveal('resultSummary'));
+for(const panel of ['pressure','signal'])$(`mobileView-${panel}`).addEventListener('click',()=>{
+  $('motionWorkspace').dataset.mobilePanel=panel;
+  for(const key of ['pressure','signal'])$(`mobileView-${key}`).setAttribute('aria-pressed',String(key===panel));
+  presentation.syncPlot();
+});
+for(const [id,boundary] of [['markSegmentStart','start'],['markSegmentEnd','end']])$(id).addEventListener('click',()=>{
+  if(!state.analysis)return;
+  const start=boundary==='start'?state.cursor:state.analysis.requestedStart,end=boundary==='end'?state.cursor:state.analysis.requestedEnd;
+  try{analyseSegment(state.record,start,end);}
+  catch{pause();text('boundaryStatus',boundary==='start'?'起点需早于终点，并保留至少两个采样点；原片段未改变。':'终点需晚于起点，并保留至少两个采样点；原片段未改变。');return;}
+  $('segmentStart').value=start;$('segmentEnd').value=end;pause();applySegment(false);
+});
 $('restartButton').addEventListener('click',()=>{pause();setCursor(0);});
 $('playSpeed').addEventListener('change',event=>{state.speed=Number(event.target.value);state.lastFrame=performance.now();});
 $('seekRange').addEventListener('input',event=>setCursor(Number(event.target.value)));
@@ -319,7 +344,7 @@ $('importFile').addEventListener('change',async event=>{
 createPoints();enable(false);requestAnimationFrame(tick);
 $('startExample').addEventListener('click',async()=>{$('recordSelect').value='GaCo01_01';await loadRecord('GaCo01_01');$('recordArea').scrollIntoView({block:'start',behavior:'instant'});$('stagePlay').focus({preventScroll:true});});
 $('startImport').addEventListener('click',()=>$('importFile').click());
-$('startRestore').addEventListener('click',()=>{$('sessionArea').scrollIntoView({block:'start',behavior:'instant'});$('savedSessionSelect').focus({preventScroll:true});});
+$('startRestore').addEventListener('click',()=>{experience.reveal('sessionArea');$('savedSessionSelect').focus({preventScroll:true});});
 if('ResizeObserver' in window){const observer=new ResizeObserver(()=>{if(state.record){drawPlot();renderFrame();}});observer.observe($('wavePlot'));observer.observe($('sensorDiagram'));}
 try{
   const response=await fetch('./data/records.json');if(!response.ok)throw new Error('样本目录暂时无法读取。');

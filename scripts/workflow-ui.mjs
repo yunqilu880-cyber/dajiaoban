@@ -1,11 +1,13 @@
 import {SESSION_STORAGE_KEY,SESSION_LIMIT,SESSION_MAX_BYTES,normalizeSession,parseSessionJSON,mergeSavedSession,analysisSummary} from './sessions.mjs?v=workflow-6';
+import {explainObservation} from './observation.mjs?v=guided-1';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n=(value,digits=1)=>Number.isFinite(value)?value.toLocaleString('zh-CN',{minimumFractionDigits:digits,maximumFractionDigits:digits}):'—';
 const newId=()=>globalThis.crypto?.randomUUID?.()||`session-${Date.now()}-${Math.random().toString(36).slice(2,9)}`;
 
-export function createWorkflow({getSession,onRestore,onReport,onPeak}){
+export function createWorkflow({getSession,onRestore,onReport,onPeak,onQuality}){
   let ready=false,busy=false,workingId=null,pending=null,saved=[],storageHealthy=true;
+  let inspectQuality=false;
   function message(text,error=false){$('sessionStatus').textContent=text;$('sessionStatus').classList.toggle('is-error',error);}
   function controls(){
     ['exportSession','workflowReport'].forEach(id=>{$(id).disabled=!ready||busy;});
@@ -77,7 +79,7 @@ export function createWorkflow({getSession,onRestore,onReport,onPeak}){
   });
   $('sessionDataFile').addEventListener('change',async event=>{const file=event.target.files?.[0];if(!file||!pending){event.target.value='';return;}try{await restore(pending,file);}finally{event.target.value='';}});
   $('cancelSessionRestore').addEventListener('click',()=>{pending=null;$('sessionDataPrompt').hidden=true;message('已取消待恢复会话，当前分析保持不变。');});
-  $('workflowReport').addEventListener('click',()=>{if(ready)onReport();});$('summaryPeak').addEventListener('click',()=>{if(ready)onPeak();});
+  $('workflowReport').addEventListener('click',()=>{if(ready)onReport();});$('summaryPeak').addEventListener('click',()=>{if(ready){if(inspectQuality)onQuality();else onPeak();}});
   function recordChanged(record){
     pending=null;workingId=null;$('sessionDataPrompt').hidden=true;$('sessionTitleInput').value=`${record.id} · 片段观察`;$('sessionNote').value='';
     if(!busy)message('记录已载入，可保存本次选段、参数与备注。');
@@ -87,15 +89,17 @@ export function createWorkflow({getSession,onRestore,onReport,onPeak}){
   }
   function updateSummary(record,analysis,research){
     const result=analysisSummary(record,analysis,research);$('resultSummary').setAttribute('aria-busy','false');
+    const explanation=explainObservation(record,analysis);inspectQuality=explanation.target==='quality';
     $('summarySource').textContent=`${record.local?'本地文件':'公开记录'} · ${record.file} · 实际采样 ${n(analysis.start,4)}–${n(analysis.end,4)} s · ${analysis.samples}条`;
-    $('summaryFacts').innerHTML=`<article><span>本次有效采样范围</span><strong>${n(result.duration,2)} <small>s</small></strong><p>${n(result.samples,0)}条原始采样参与统计</p></article><article><span>可用于研究的估计周期</span><strong>${result.leftCycles} <small>左</small> / ${result.rightCycles} <small>右</small></strong><p>按当前参数排除：左${result.leftExcluded} / 右${result.rightExcluded}个区间</p></article><article><span>数据与结果使用条件</span><strong class="summary-attention">${esc(result.attention)}</strong><p>采样与总量检查覆盖整份记录；周期统计仅限当前选段</p></article>`;
-    $('summaryObservation').textContent=`本片段${result.leftShare===null?'总受力积分为0，左右占比不可用':`左脚受力积分占比${n(result.leftShare*100)}%，右脚${n(result.rightShare*100)}%`}；双脚合计峰值${n(result.peakSum)} N，出现在${n(result.peakTime,2)}秒。可定位该帧复查。`;
+    $('summaryFacts').innerHTML=`<article><span>01 / 数据条件</span><strong>${esc(explanation.qualityTitle)}</strong><p>${esc(explanation.quality)}</p></article><article><span>02 / 主要观察</span><strong>当前选段</strong><p>${esc(explanation.observation)}</p></article><article><span>03 / 下一步</span><strong>回到原始信号</strong><p>${esc(explanation.action)}</p></article>`;
+    $('summaryObservation').textContent=`${explanation.evidence} ${explanation.source}。`;
+    $('summaryPeak').textContent=explanation.actionLabel+' ↗';
     const reviews=result.review.length?result.review:['按当前工程阈值，未发现整记录大采样间隔或总量差异；这不代表测量已标定。'];
     $('summaryReviewCount').textContent=`${result.review.length}项待核查条件`;
     $('summaryReviewList').innerHTML=[...reviews,'触地、周期与CoP仍是未经独立参考标注验证的工程估计。'].map(value=>`<li>${esc(value)}</li>`).join('');
   }
   let frame=0;
-  function updateNavigation(){frame=0;const offset=innerWidth<=600?145:165;let current='resultSummary';for(const link of document.querySelectorAll('[data-task]')){if($(link.dataset.task).getBoundingClientRect().top<=offset)current=link.dataset.task;}if(scrollY+innerHeight>=document.documentElement.scrollHeight-2&&$('sessionArea').getBoundingClientRect().top<innerHeight)current='sessionArea';document.querySelectorAll('[data-task]').forEach(link=>{if(link.dataset.task===current)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');});}
+  function updateNavigation(){frame=0;const offset=innerWidth<=600?145:165;let current='recordArea',nearest=-Infinity;for(const link of document.querySelectorAll('[data-task]')){const target=$(link.dataset.task);if(link.hidden||!target.getClientRects().length)continue;const top=target.getBoundingClientRect().top;if(top<=offset&&top>nearest){current=link.dataset.task;nearest=top;}}if(scrollY+innerHeight>=document.documentElement.scrollHeight-2&&$('sessionArea').getBoundingClientRect().top<innerHeight)current='sessionArea';document.querySelectorAll('[data-task]').forEach(link=>{if(link.dataset.task===current)link.setAttribute('aria-current','location');else link.removeAttribute('aria-current');});}
   window.addEventListener('scroll',()=>{if(!frame)frame=requestAnimationFrame(updateNavigation);},{passive:true});window.addEventListener('resize',updateNavigation);
   readStorage();controls();updateNavigation();
   return {recordChanged,updateSummary,resetSummary,setReady:value=>{ready=value;controls();},note:()=>({title:$('sessionTitleInput').value,note:$('sessionNote').value,sessionId:workingId})};
