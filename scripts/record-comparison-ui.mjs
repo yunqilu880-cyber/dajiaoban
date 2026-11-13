@@ -1,4 +1,5 @@
-import {captureRecordSnapshot,compareRecordSnapshots,publicParticipant} from './record-comparison.mjs?v=experience-7';
+import {captureRecordSnapshot,compareRecordSnapshots,publicParticipant} from './record-comparison.mjs?v=archive-1';
+import {createComparisonArchiveUI} from './comparison-archive-ui.mjs?v=archive-1';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const n=(value,digits=2)=>Number.isFinite(value)?value.toLocaleString('zh-CN',{maximumFractionDigits:digits}):'—';
@@ -8,22 +9,24 @@ const range=s=>`${n(s.range.start,4)}–${n(s.range.end,4)} s · ${s.range.sampl
 
 export function recordComparisonMarkup(comparison){
   if(!comparison)return '';
-  return `<h3>记录间对照 · ${esc(comparison.title)}</h3><p>差值固定为B − A。对象与测试条件以各次保存时的快照为准。</p>${['a','b'].map(key=>{const s=comparison[key];return `<p><strong>${key.toUpperCase()} · ${esc(s.source.file)}</strong><br>${esc(meta(s))}<br>实际范围 ${range(s)}；有效周期：左${s.cycles.left.n} / 右${s.cycles.right.n}<br>SHA-256：${esc(s.source.sha256)}<br>名义采样率：${s.source.nominalHz?`${n(s.source.nominalHz)} Hz`:"未提供"}；按中位间隔估计 ${n(s.source.estimatedHz)} Hz<br>候选触地进入 / 退出门限：左 ${n(s.eventThresholds.leftEnterN)} / ${n(s.eventThresholds.leftExitN)} N；右 ${n(s.eventThresholds.rightEnterN)} / ${n(s.eventThresholds.rightExitN)} N<br>已应用参数：${esc(JSON.stringify(s.parameters))}</p>`;}).join('')}<table><thead><tr><th>指标</th><th>A</th><th>B</th><th>B − A</th></tr></thead><tbody>${rows(comparison)}</tbody></table><ul>${comparison.warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul>`;
+  const note=comparison.analysisNote;
+  return `${note?.note?`<div class="report-provenance"><strong>对照备注 · 用户填写 · ${esc(note.title)}</strong><p>${esc(note.note).replace(/\n/g,'<br>')}</p></div>`:''}<h3>记录间对照 · ${esc(comparison.title)}</h3><p>差值固定为B − A。对象与测试条件以各次保存时的快照为准。</p>${['a','b'].map(key=>{const s=comparison[key];return `<p><strong>${key.toUpperCase()} · ${esc(s.source.file)}</strong><br>${esc(meta(s))}<br>实际范围 ${range(s)}；有效周期：左${s.cycles.left.n} / 右${s.cycles.right.n}<br>SHA-256：${esc(s.source.sha256)}<br>名义采样率：${s.source.nominalHz?`${n(s.source.nominalHz)} Hz`:"未提供"}；按中位间隔估计 ${n(s.source.estimatedHz)} Hz<br>候选触地进入 / 退出门限：左 ${n(s.eventThresholds.leftEnterN)} / ${n(s.eventThresholds.leftExitN)} N；右 ${n(s.eventThresholds.rightEnterN)} / ${n(s.eventThresholds.rightExitN)} N<br>已应用参数：${esc(JSON.stringify(s.parameters))}</p>`;}).join('')}<table><thead><tr><th>指标</th><th>A</th><th>B</th><th>B − A</th></tr></thead><tbody>${rows(comparison)}</tbody></table><ul>${comparison.warnings.map(w=>`<li>${esc(w)}</li>`).join('')}</ul>`;
 }
 
-export function createRecordComparison({getCurrent,download,onReport}){
-  let ready=false,slots={a:null,b:null};
-  function result(){return slots.a&&slots.b?compareRecordSnapshots(slots.a,slots.b):null;}
+export function createRecordComparison({getCurrent,download,onReport,onRestoreArchive}){
+  let ready=false,slots={a:null,b:null},archives=null,archiveBusy=false;
+  function result(){if(!slots.a||!slots.b)return null;const comparison=compareRecordSnapshots(slots.a,slots.b);if(archives)comparison.analysisNote=archives.details();return comparison;}
   function render(){
     for(const key of ['a','b']){
       const upper=key.toUpperCase(),s=slots[key];
-      $(`captureRecord${upper}`).disabled=!ready;
+      $(`captureRecord${upper}`).disabled=!ready||archiveBusy;
       $(`captureRecord${upper}`).textContent=s?`更新为当前记录 ${upper}`:`将当前分析保存为 ${upper}`;
       $(`recordSlot${upper}`).innerHTML=s?`<span class="record-slot-code">${esc(s.source.id)}</span><h3>${esc(s.source.file)}</h3><p>${esc(meta(s))}</p><p>${range(s)}<br>有效周期：左${s.cycles.left.n} / 右${s.cycles.right.n}</p><details><summary>文件摘要与参数</summary><p class="snapshot-hash">${esc(s.source.sha256)}</p><p>${esc(JSON.stringify(s.parameters))}</p></details>`:'<span class="record-slot-code">等待加入</span><h3>尚无记录</h3><p>载入并分析一份记录，再保存到这里。切换数据不会清空已保存的对照。</p>';
     }
     const comparison=result();$('recordComparisonResults').hidden=!comparison;
-    $('clearRecordComparison').disabled=!slots.a&&!slots.b;
-    $('exportRecordComparison').disabled=!comparison;$('reportRecordComparison').disabled=!comparison;
+    $('clearRecordComparison').disabled=archiveBusy||(!slots.a&&!slots.b);
+    $('exportRecordComparison').disabled=archiveBusy||!comparison;$('reportRecordComparison').disabled=archiveBusy||!comparison;
+    archives?.update();
     if(!comparison)return;
     $('recordRelationship').textContent=comparison.title;
     $('recordDateOrder').textContent=comparison.dateOrder?`${comparison.dateOrder} · 日期与对象编号由用户填写`:'未建立跨日期时间顺序';
@@ -46,5 +49,6 @@ export function createRecordComparison({getCurrent,download,onReport}){
     $('comparisonContextNote').textContent=record.local?'填写匿名对象编号与实际测试条件，保存后固定在对应记录中。请勿填写姓名。':'公开样本对象编号从文件名读取；原始测试日期与鞋具条件未在当前样本清单中提供。';
     $('recordCompareStatus').textContent='当前记录已切换；已保存的A/B摘要仍保留。编辑条件后，需点击更新才会写入快照。';
   }
+  archives=createComparisonArchiveUI({getSlots:()=>slots,setSlots:value=>{slots=value;render();},onRestore:onRestoreArchive,onBusy:value=>{archiveBusy=value;render();},download});
   render();return {recordChanged,result,setReady(value){ready=value;render();}};
 }

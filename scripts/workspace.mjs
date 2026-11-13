@@ -5,7 +5,9 @@ import {createWorkflow} from './workflow-ui.mjs?v=guided-1';
 import {createPresentation} from './presentation.mjs?v=guided-1';
 import {createWorkspaceExperience} from './workspace-experience.mjs?v=guided-1';
 import {pressureAppearance} from './motion-data.mjs?v=motion-8';
-import {createRecordComparison,recordComparisonMarkup} from './record-comparison-ui.mjs?v=experience-7';
+import {createRecordComparison,recordComparisonMarkup} from './record-comparison-ui.mjs?v=archive-1';
+import {normalizeComparisonArchive,rebuildArchivedSnapshot} from './comparison-archives.mjs?v=archive-1';
+import {reportVisualMarkup} from './report-visuals.mjs?v=archive-1';
 
 const $=id=>document.getElementById(id);
 const text=(id,value)=>{$(id).textContent=value;};
@@ -19,7 +21,7 @@ const cached=new Map();let manifest=[],controller=null;
 const experience=createWorkspaceExperience();
 const workflow=createWorkflow({getSession:snapshotSession,onRestore:restoreAnalysisSession,onReport:openReport,onPeak:()=>{pause();setCursor(state.analysis.peakTime);experience.reveal('motionWorkspace');},onQuality:()=>{experience.reveal('explorer');$('tab-quality').click();}});
 const presentation=createPresentation({getState:()=>({...state,research:explorer.researchData()}),onToggle:()=>{state.playing?pause():play();},onSeek:value=>{pause();setCursor(value);},onSpeed:value=>{state.speed=value;$('playSpeed').value=String(value);},onPointTools:()=>{$('rawSignals').open=true;$('rawSignals').scrollIntoView({block:'start',behavior:'instant'});$('pointSelect').focus({preventScroll:true});}});
-const recordComparison=createRecordComparison({getCurrent:()=>({record:state.record,analysis:state.analysis,research:explorer.researchData()}),download,onReport:openComparisonReport});
+const recordComparison=createRecordComparison({getCurrent:()=>({record:state.record,analysis:state.analysis,research:explorer.researchData()}),download,onReport:openComparisonReport,onRestoreArchive:restoreComparisonArchive});
 const explorer=createExplorer({
   locate(time,point,full=false){
     if(!state.record)return;
@@ -265,9 +267,31 @@ async function restoreAnalysisSession(input,file){
   status('已恢复核验后的分析会话，参数与对比结果已重新计算。');
   return {needsFile:false};
 }
+async function restoreComparisonArchive(input,files=[]){
+  const archive=normalizeComparisonArchive(input),provided=new Map(),resolved={},needsFiles=[];
+  if(files.length>2)throw new Error('请最多选择两份对应的原始文件。');
+  for(const file of files){const record=await readLocalRecord(file);provided.set(record.sha256,record);}
+  const requiredHashes=new Set(Object.values(archive.slots).filter(Boolean).filter(slot=>slot.source.kind==='local').map(slot=>slot.source.sha256));
+  for(const hash of provided.keys())if(!requiredHashes.has(hash))throw new Error('选中的文件不是档案所需的本地原文件，请核对文件摘要。');
+  for(const key of ['a','b']){
+    const slot=archive.slots[key];if(!slot){resolved[key]=null;continue;}
+    const source=slot.source;let record;
+    if(source.kind==='public'){
+      const meta=manifest.find(item=>item.id===source.id&&item.sha256===source.sha256);
+      if(!meta)throw new Error('档案来源不在当前公开样本目录，未访问档案中的外部地址。');
+      record=await fetchPublicRecord(meta);
+    }else{
+      record=provided.get(source.sha256)||[...cached.values()].find(item=>item.local&&item.sha256===source.sha256);
+      if(!record){if(!needsFiles.some(item=>item.sha256===source.sha256))needsFiles.push(source);continue;}
+    }
+    resolved[key]=rebuildArchivedSnapshot(slot,record);
+  }
+  if(needsFiles.length){for(const [hash,record] of provided)cached.set(`archive-local:${hash}`,record);return {needsFiles};}
+  return {slots:resolved};
+}
 function reportMarkup(){
   const report=currentReport(),a=report.segment;
-  return `${report.analysisNote.note?`<div class="report-provenance"><strong>用户研究备注 · ${escape(report.analysisNote.title)}</strong><p>${escape(report.analysisNote.note).replace(/\n/g,"<br>")}</p></div>`:""}<div class="report-provenance"><span class="source-pill">${escape(report.mode)}</span><p>${escape(report.record.source)}<br>记录：${escape(report.record.file)} · 原始受力单位 N</p><p>回放以首样本为0秒；首样本原始时间 ${number(report.record.timeOrigin,4)} s，CSV保留原始时间列。</p></div><dl class="report-facts"><div><dt>请求片段</dt><dd>${number(a.requestedStart,2)}–${number(a.requestedEnd,2)} s</dd></div><div><dt>实际采样范围</dt><dd>${number(a.start,4)}–${number(a.end,4)} s</dd></div><div><dt>参与统计采样</dt><dd>${a.samples}条</dd></div><div><dt>方法版本</dt><dd>${escape(report.method.version)}</dd></div></dl><table><thead><tr><th>观察项</th><th>左脚</th><th>右脚</th></tr></thead><tbody><tr><td>采样均值</td><td>${number(a.leftMean)} N</td><td>${number(a.rightMean)} N</td></tr><tr><td>总受力峰值</td><td>${number(a.leftPeak)} N</td><td>${number(a.rightPeak)} N</td></tr><tr><td>受力积分占比</td><td>${a.leftShare===null?'—':number(a.leftShare*100)+'%'}</td><td>${a.rightShare===null?'—':number(a.rightShare*100)+'%'}</td></tr><tr><td>候选触地次数</td><td>${a.leftEvents}</td><td>${a.rightEvents}</td></tr></tbody></table>${reportDetailsMarkup(report)}<h3>方法与范围</h3><p>${escape(report.method.summary)}</p><p>${escape(report.method.contact)}</p><p>${escape(report.method.boundaries)}</p><div class="report-source"><strong>来源与追溯</strong><p>${report.record.sourceUrl?escape(report.record.sourceUrl):'本地文件，来源与单位由导入者确认。'}</p><p>SHA-256：${escape(report.record.sha256||'当前环境未计算')}</p><p>生成时间：${escape(new Date(report.generatedAt).toLocaleString('zh-CN'))} · 公开数据背景及许可见研究与验证页。本报告不是疾病诊断。</p></div>`;
+  return `${report.analysisNote.note?`<div class="report-provenance"><strong>用户研究备注 · ${escape(report.analysisNote.title)}</strong><p>${escape(report.analysisNote.note).replace(/\n/g,"<br>")}</p></div>`:""}<div class="report-provenance"><span class="source-pill">${escape(report.mode)}</span><p>${escape(report.record.source)}<br>记录：${escape(report.record.file)} · 原始受力单位 N</p><p>回放以首样本为0秒；首样本原始时间 ${number(report.record.timeOrigin,4)} s，CSV保留原始时间列。</p></div><dl class="report-facts"><div><dt>请求片段</dt><dd>${number(a.requestedStart,2)}–${number(a.requestedEnd,2)} s</dd></div><div><dt>实际采样范围</dt><dd>${number(a.start,4)}–${number(a.end,4)} s</dd></div><div><dt>参与统计采样</dt><dd>${a.samples}条</dd></div><div><dt>方法版本</dt><dd>${escape(report.method.version)}</dd></div></dl>${reportVisualMarkup(state.record,state.analysis)}<h3>选段数值摘要</h3><table><thead><tr><th>观察项</th><th>左脚</th><th>右脚</th></tr></thead><tbody><tr><td>采样均值</td><td>${number(a.leftMean)} N</td><td>${number(a.rightMean)} N</td></tr><tr><td>总受力峰值</td><td>${number(a.leftPeak)} N</td><td>${number(a.rightPeak)} N</td></tr><tr><td>受力积分占比</td><td>${a.leftShare===null?'—':number(a.leftShare*100)+'%'}</td><td>${a.rightShare===null?'—':number(a.rightShare*100)+'%'}</td></tr><tr><td>候选触地次数</td><td>${a.leftEvents}</td><td>${a.rightEvents}</td></tr></tbody></table>${reportDetailsMarkup(report)}<h3>方法与范围</h3><p>${escape(report.method.summary)}</p><p>${escape(report.method.contact)}</p><p>${escape(report.method.boundaries)}</p><div class="report-source"><strong>来源与追溯</strong><p>${report.record.sourceUrl?escape(report.record.sourceUrl):'本地文件，来源与单位由导入者确认。'}</p><p>SHA-256：${escape(report.record.sha256||'当前环境未计算')}</p><p>生成时间：${escape(new Date(report.generatedAt).toLocaleString('zh-CN'))} · 公开数据背景及许可见研究与验证页。本报告不是疾病诊断。</p></div>`;
 }
 function showReport(markup,title,kind){pause();state.reportKind=kind;$('reportTitle').textContent=title;$('reportContent').innerHTML=markup;$('printReportRoot').innerHTML=`<h1>足元康｜${title}</h1>`+markup;$('printReportRoot').querySelectorAll('details').forEach(node=>{node.open=true;});$('reportDialog').showModal();}
 function openReport(){if(state.analysis)showReport(reportMarkup(),'足底受力片段观察报告','segment');}
@@ -291,6 +315,7 @@ $('mobilePlay').addEventListener('click',()=>state.playing?pause():play());
 $('mobileSeek').addEventListener('input',event=>{pause();setCursor(Number(event.target.value));});
 $('mobileReport').addEventListener('click',openReport);
 $('showInterpretation').addEventListener('click',()=>experience.reveal('resultSummary'));
+$('openComparisonArchives').addEventListener('click',()=>experience.reveal('comparisonArchiveArea'));
 for(const panel of ['pressure','signal'])$(`mobileView-${panel}`).addEventListener('click',()=>{
   $('motionWorkspace').dataset.mobilePanel=panel;
   for(const key of ['pressure','signal'])$(`mobileView-${key}`).setAttribute('aria-pressed',String(key===panel));

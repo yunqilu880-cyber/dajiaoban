@@ -16,7 +16,7 @@ export function captureRecordSnapshot(record,analysis,research,metadata={}){
   const cycle=side=>({n:research.cycles[side].validCount,...research.cycles[side].duration});
   return {methodVersion:METHOD_VERSION,capturedAt:new Date().toISOString(),
     source:{kind:record.local?'local':'public',id:record.id,file:record.file,sha256:record.sha256,origin:record.origin,source:record.source,integrity:record.integrity,
-      timeUnit:'s',forceUnit:'N',nominalHz:record.nominalHz||null,estimatedHz:record.estimatedHz},
+      timeUnit:'s',forceUnit:'N',nominalHz:record.nominalHz||null,estimatedHz:record.estimatedHz,samples:record.rows.length,duration:record.duration},
     context:{participantId:record.local?text(metadata.participantId,60):publicParticipant(record),identityBasis:record.local?'用户填写':'公开记录编号',
       date:record.local?dateOnly(metadata.date):'',task:record.local?text(metadata.task,80):'普通行走',footwear:record.local?text(metadata.footwear,80):''},
     range:{requestedStart:analysis.requestedStart,requestedEnd:analysis.requestedEnd,start:analysis.start,end:analysis.end,samples:analysis.samples,duration:analysis.end-analysis.start},
